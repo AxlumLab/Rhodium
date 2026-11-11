@@ -1,10 +1,10 @@
-# Contributing to Toolkit Package Manager
+# Contributing to Rhodium
 
-Toolkit Package Manager is a C/C++ dependency manager for CMake projects. Contributions should preserve that scope.
+Rhodium is a C/C++ dependency manager for CMake projects. Contributions should preserve that scope.
 
 ## Contribution rules
 
-- Do not turn Toolkit Package Manager into a general-purpose build-system replacement.
+- Do not turn Rhodium into a general-purpose build-system replacement.
 - Do not change CLI behavior, DSL fields, lockfile format, artifact IDs, or cache layout unless the change is explicitly planned.
 - Prefer small, staged changes over broad rewrites.
 - Keep `model/` as plain data and validation logic. Do not move I/O, resolver, builder, or CLI behavior into model structures.

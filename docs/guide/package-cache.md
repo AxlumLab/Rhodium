@@ -1,15 +1,15 @@
 # Package cache
 
-Toolkit Package Manager stores dependency state under `.tpkg/`.
+Rhodium stores dependency state under `.rhodium/`.
 
 ## Main directories
 
 ```text
-.tpkg/packages/          fetched dependency sources
-.tpkg/build-packages/    dependency build workspaces
-.tpkg/artifacts/         exported dependency artifacts
-.tpkg/generated/cmake/   generated CMake integration files
-.tpkg/toolchains/        detected toolchain cache
+.rhodium/packages/          fetched dependency sources
+.rhodium/build-packages/    dependency build workspaces
+.rhodium/artifacts/         exported dependency artifacts
+.rhodium/generated/cmake/   generated CMake integration files
+.rhodium/toolchains/        detected toolchain cache
 ```
 
 ## Artifact identity
@@ -19,8 +19,8 @@ Artifact identity is derived from dependency source state and build-relevant con
 ## Inspect packages
 
 ```bash
-tpkg packages
-tpkg packages --verbose
+rhodium packages
+rhodium packages --verbose
 ```
 
 ## Garbage collect unused artifacts
@@ -28,17 +28,17 @@ tpkg packages --verbose
 Dry run:
 
 ```bash
-tpkg packages gc
+rhodium packages gc
 ```
 
 Apply:
 
 ```bash
-tpkg packages gc --apply
+rhodium packages gc --apply
 ```
 
 Options:
 
 ```bash
-tpkg packages gc --package fmt --builds --sources
+rhodium packages gc --package fmt --builds --sources
 ```

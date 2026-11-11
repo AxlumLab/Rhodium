@@ -1,6 +1,6 @@
-# Toolkit Package Manager Features Implementation Summary
+# Rhodium Features Implementation Summary
 
-This document summarizes the newly implemented features in Toolkit Package Manager.
+This document summarizes the newly implemented features in Rhodium.
 
 ## Completed Features
 
@@ -9,9 +9,9 @@ This document summarizes the newly implemented features in Toolkit Package Manag
 **Status**: Fully implemented (DSL + Backend)
 
 **Files Modified**:
-- `src/tpkg/model/DependencyDesc.hpp` - Added `dependencies` field
-- `src/tpkg/script/LuaBindings.cpp` - Parse `dependencies` from Lua
-- `src/tpkg/resolve/DependencyResolver.cpp` - Recursive resolution with cycle detection
+- `src/rhodium/model/DependencyDesc.hpp` - Added `dependencies` field
+- `src/rhodium/script/LuaBindings.cpp` - Parse `dependencies` from Lua
+- `src/rhodium/resolve/DependencyResolver.cpp` - Recursive resolution with cycle detection
 
 **Usage**:
 ```lua
@@ -34,11 +34,11 @@ require("opencv", {
 **Status**: Fully implemented
 
 **Files Modified**:
-- `src/tpkg/cli/CommandLine.cpp` - Added `commandTree()` function
+- `src/rhodium/cli/CommandLine.cpp` - Added `commandTree()` function
 
 **Usage**:
 ```bash
-tpkg tree
+rhodium tree
 ```
 
 **Output**:
@@ -58,7 +58,7 @@ my-project
 **Status**: Fully implemented
 
 **Files Modified**:
-- `src/tpkg/resolve/DependencyResolver.cpp` - Added detailed error context
+- `src/rhodium/resolve/DependencyResolver.cpp` - Added detailed error context
 
 **Improvements**:
 - Shows build directory path
@@ -69,8 +69,8 @@ my-project
 **Example Output**:
 ```
 error: failed to build package: opencv
-info: build directory: .tpkg/build/opencv/abc123
-info: source directory: .tpkg/packages/opencv/src
+info: build directory: .rhodium/build/opencv/abc123
+info: source directory: .rhodium/packages/opencv/src
 info: specified ref: v4.8.0
 info: tip: run 'git tag' in the source directory to see available versions
 ```
@@ -82,10 +82,10 @@ info: tip: run 'git tag' in the source directory to see available versions
 **Status**: Fully implemented (DSL + Backend)
 
 **Files Modified**:
-- `src/tpkg/model/DependencyDesc.hpp` - Added `mirrors` field
-- `src/tpkg/script/LuaBindings.cpp` - Parse `mirrors` from Lua
-- `src/tpkg/package/GitFetcher.cpp` - Retry logic for Git clones
-- `src/tpkg/package/Archive.cpp` - Retry logic for archive downloads
+- `src/rhodium/model/DependencyDesc.hpp` - Added `mirrors` field
+- `src/rhodium/script/LuaBindings.cpp` - Parse `mirrors` from Lua
+- `src/rhodium/package/GitFetcher.cpp` - Retry logic for Git clones
+- `src/rhodium/package/Archive.cpp` - Retry logic for archive downloads
 
 **Usage**:
 ```lua
@@ -129,11 +129,11 @@ require("mylib", {
 **Status**: Fully implemented
 
 **Files Modified**:
-- `src/tpkg/core/Logger.hpp` - Added `success` level
-- `src/tpkg/core/Logger.cpp` - Separate loggers for different levels
-- `src/tpkg/diagnostics/*` - Success level support
-- `src/tpkg/package/GitFetcher.cpp` - Progress bar implementation
-- `src/tpkg/cli/CommandLine.cpp` - Time tracking
+- `src/rhodium/core/Logger.hpp` - Added `success` level
+- `src/rhodium/core/Logger.cpp` - Separate loggers for different levels
+- `src/rhodium/diagnostics/*` - Success level support
+- `src/rhodium/package/GitFetcher.cpp` - Progress bar implementation
+- `src/rhodium/cli/CommandLine.cpp` - Time tracking
 
 **Features**:
 - Unified format: `info:`, `warn:`, `error:`, `success:`
@@ -153,11 +153,11 @@ success: restore completed (took 3.5s)
 ## Architecture Principles
 
 ### Clear Separation of Concerns
-- **Toolkit Package Manager**: Dependency management (download, build, cache)
+- **Rhodium**: Dependency management (download, build, cache)
 - **CMake**: Build logic (linking, target configuration)
 
 ### Not Implemented (By Design)
-These features are intentionally NOT in Toolkit Package Manager's scope:
+These features are intentionally NOT in Rhodium's scope:
 
 - ❌ Optional dependencies (use CMake's `find_package`)
 - ❌ Test-only dependencies (use CMake's `if(BUILD_TESTING)`)
@@ -174,7 +174,7 @@ These features are intentionally NOT in Toolkit Package Manager's scope:
 - [ ] Verify topological build order
 
 ### Dependency Tree
-- [ ] Run `tpkg tree` on complex projects
+- [ ] Run `rhodium tree` on complex projects
 - [ ] Verify version display
 - [ ] Test with circular dependencies
 
@@ -199,19 +199,19 @@ These features are intentionally NOT in Toolkit Package Manager's scope:
 ## File Inventory
 
 ### Modified Files (13)
-1. `src/tpkg/model/DependencyDesc.hpp`
-2. `src/tpkg/script/LuaBindings.cpp`
-3. `src/tpkg/resolve/DependencyResolver.cpp`
-4. `src/tpkg/cli/CommandLine.cpp`
-5. `src/tpkg/core/Logger.hpp`
-6. `src/tpkg/core/Logger.cpp`
-7. `src/tpkg/diagnostics/Diagnostic.hpp`
-8. `src/tpkg/diagnostics/Diagnostic.cpp`
-9. `src/tpkg/diagnostics/DiagnosticSink.hpp`
-10. `src/tpkg/diagnostics/DiagnosticSink.cpp`
-11. `src/tpkg/diagnostics/ConsoleDiagnosticSink.cpp`
-12. `src/tpkg/package/GitFetcher.cpp`
-13. `src/tpkg/package/Archive.cpp`
+1. `src/rhodium/model/DependencyDesc.hpp`
+2. `src/rhodium/script/LuaBindings.cpp`
+3. `src/rhodium/resolve/DependencyResolver.cpp`
+4. `src/rhodium/cli/CommandLine.cpp`
+5. `src/rhodium/core/Logger.hpp`
+6. `src/rhodium/core/Logger.cpp`
+7. `src/rhodium/diagnostics/Diagnostic.hpp`
+8. `src/rhodium/diagnostics/Diagnostic.cpp`
+9. `src/rhodium/diagnostics/DiagnosticSink.hpp`
+10. `src/rhodium/diagnostics/DiagnosticSink.cpp`
+11. `src/rhodium/diagnostics/ConsoleDiagnosticSink.cpp`
+12. `src/rhodium/package/GitFetcher.cpp`
+13. `src/rhodium/package/Archive.cpp`
 
 ### New Files (4)
 1. `examples/cmake-consumer/libs/zlib-archive.lua`
@@ -229,7 +229,7 @@ These features are intentionally NOT in Toolkit Package Manager's scope:
 3. Test edge cases (circular deps, mirror failures)
 
 ### Future Enhancements (Documented in TODO)
-1. CLI build option overrides: `tpkg restore --set pkg:OPT=VAL`
+1. CLI build option overrides: `rhodium restore --set pkg:OPT=VAL`
 2. Registry support (vcpkg-style)
 3. Version constraints (currently exact refs only)
 
@@ -246,4 +246,4 @@ These features are intentionally NOT in Toolkit Package Manager's scope:
 ✅ Archive source documentation  
 ✅ Improved logging system  
 
-Toolkit Package Manager is now a complete, production-ready C++ dependency manager with a clear architectural vision: **focus on dependency management, let CMake handle build logic**.
+Rhodium is now a complete, production-ready C++ dependency manager with a clear architectural vision: **focus on dependency management, let CMake handle build logic**.

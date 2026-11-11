@@ -5,7 +5,7 @@
 -->
 # Exit codes
 
-Toolkit Package Manager currently uses a simple exit-code policy.
+Rhodium currently uses a simple exit-code policy.
 
 | Code | Meaning |
 | --- | --- |

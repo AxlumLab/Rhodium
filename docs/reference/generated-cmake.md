@@ -1,11 +1,11 @@
 # Generated CMake
 
-`tpkg generate` writes CMake integration files for restored dependency artifacts.
+`rhodium generate` writes CMake integration files for restored dependency artifacts.
 
 ## Default output
 
 ```text
-.tpkg/generated/cmake/
+.rhodium/generated/cmake/
 ```
 
 ## Include policy
@@ -13,7 +13,7 @@
 Include generated files from your root `CMakeLists.txt` after restore and generate.
 
 ```cmake
-include("${CMAKE_SOURCE_DIR}/.tpkg/generated/cmake/tpkg_deps.cmake")
+include("${CMAKE_SOURCE_DIR}/.rhodium/generated/cmake/rhodiumConfig.cmake")
 ```
 
 ## Regeneration

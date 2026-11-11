@@ -9,7 +9,7 @@ This document applies to project discussions, issues, pull requests, review comm
 - Be direct and technical when reviewing code.
 - Criticize behavior, design, and implementation details rather than people.
 - Provide enough context for maintainers and contributors to reproduce problems.
-- Respect project scope: Toolkit Package Manager is a dependency manager for CMake projects, not a general build-system replacement.
+- Respect project scope: Rhodium is a dependency manager for CMake projects, not a general build-system replacement.
 
 ## Unacceptable behavior
 

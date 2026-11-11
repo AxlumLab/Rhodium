@@ -5,7 +5,7 @@
 -->
 # DSL overview
 
-`tpkg.lua` is the dependency manifest for a Toolkit Package Manager workspace.
+`rhodium.lua` is the dependency manifest for a Rhodium workspace. If it is absent, Rhodium also accepts the legacy `tpkg.lua`. If both exist, only `rhodium.lua` is loaded; an invalid `rhodium.lua` reports an error rather than falling back. DSL fields and meanings are unchanged.
 
 The DSL is Lua-based. Treat the manifest as trusted project code.
 
@@ -38,4 +38,4 @@ require("fmt", {
 
 ## Evaluation model
 
-Toolkit Package Manager loads the manifest, builds an in-memory dependency model, validates it, resolves sources, restores artifacts, and then generates CMake integration files.
+Rhodium loads the manifest, builds an in-memory dependency model, validates it, resolves sources, restores artifacts, and then generates CMake integration files.

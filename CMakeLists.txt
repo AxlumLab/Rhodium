@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
-include(cmake/ToolkitPkgVcpkg.cmake)
+include(cmake/RhodiumVcpkg.cmake)
 
-project(ToolkitPkg VERSION 0.1.1 LANGUAGES C CXX)
+project(Rhodium VERSION 0.1.2 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -14,11 +14,11 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-include(cmake/ToolkitPkgMsvcNinjaSdk.cmake)
-include(cmake/ToolkitPkgDependencies.cmake)
-include(cmake/ToolkitPkgTargets.cmake)
+include(cmake/RhodiumMsvcNinjaSdk.cmake)
+include(cmake/RhodiumDependencies.cmake)
+include(cmake/RhodiumTargets.cmake)
 
 include(CTest)
 if(BUILD_TESTING)
-    include(cmake/ToolkitPkgTests.cmake)
+    include(cmake/RhodiumTests.cmake)
 endif()

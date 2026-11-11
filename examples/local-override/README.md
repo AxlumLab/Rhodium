@@ -3,6 +3,6 @@
 Demonstrates a local override workflow.
 
 ```bash
-tpkg override set fmt overrides/fmt
-tpkg restore --root examples/local-override fmt
+rhodium override set fmt overrides/fmt
+rhodium restore --root examples/local-override fmt
 ```

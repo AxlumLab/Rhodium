@@ -5,21 +5,21 @@
 ## Update one package
 
 ```bash
-tpkg update fmt
-tpkg restore fmt
+rhodium update fmt
+rhodium restore fmt
 ```
 
 ## Update all packages
 
 ```bash
-tpkg update --all
-tpkg restore
+rhodium update --all
+rhodium restore
 ```
 
 ## With toolchain and config
 
 ```bash
-tpkg update fmt --config release --toolchain windows-msvc-x64
+rhodium update fmt --config release --toolchain windows-msvc-x64
 ```
 
 ## Policy

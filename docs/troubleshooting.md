@@ -1,11 +1,11 @@
 # Troubleshooting
 
-## `tpkg.lua` cannot be found
+## `rhodium.lua` cannot be found
 
 Run commands from the workspace root or pass `--root <path>`.
 
 ```bash
-tpkg restore --root path/to/project
+rhodium restore --root path/to/project
 ```
 
 ## No toolchain profile is available
@@ -13,24 +13,24 @@ tpkg restore --root path/to/project
 Run:
 
 ```bash
-tpkg sdk detect
-tpkg sdk list
+rhodium sdk detect
+rhodium sdk list
 ```
 
-If detection does not find the expected SDK, register a profile manually with `tpkg sdk add`.
+If detection does not find the expected SDK, register a profile manually with `rhodium sdk add`.
 
 ## Dependency restore uses the wrong compiler
 
 Pass an explicit toolchain profile:
 
 ```bash
-tpkg restore --toolchain windows-msvc-x64
+rhodium restore --toolchain windows-msvc-x64
 ```
 
 To save a local preference:
 
 ```bash
-tpkg sdk select windows-msvc-x64
+rhodium sdk select windows-msvc-x64
 ```
 
 ## A dependency builds but CMake cannot link it
@@ -45,8 +45,8 @@ Check the dependency `artifacts` declaration. At minimum, verify:
 Then rerun:
 
 ```bash
-tpkg restore --export-only <package>
-tpkg generate
+rhodium restore --export-only <package>
+rhodium generate
 ```
 
 ## A package cache is stale
@@ -54,13 +54,13 @@ tpkg generate
 Use targeted clean first:
 
 ```bash
-tpkg clean <package> --artifacts --sources
+rhodium clean <package> --artifacts --sources
 ```
 
 Use full clean only when necessary:
 
 ```bash
-tpkg clean --all
+rhodium clean --all
 ```
 
 ## Lockfile mismatch
@@ -68,12 +68,12 @@ tpkg clean --all
 If you want exact reproducibility, use:
 
 ```bash
-tpkg restore --locked
+rhodium restore --locked
 ```
 
 If you intentionally want a new resolved commit or source state, use:
 
 ```bash
-tpkg update <package>
-tpkg restore
+rhodium update <package>
+rhodium restore
 ```

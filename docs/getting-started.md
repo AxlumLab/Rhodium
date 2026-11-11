@@ -1,11 +1,11 @@
 # Getting started
 
-This guide creates a minimal CMake project that restores dependencies through Toolkit Package Manager.
+This guide creates a minimal CMake project that restores dependencies through Rhodium.
 
-## 1. Create `tpkg.lua`
+## 1. Create `rhodium.lua`
 
 ```lua
-package("HelloTPKG")
+package("HelloRHODIUM")
 version("0.1.0")
 default_config("debug")
 default_platform("host")
@@ -31,8 +31,8 @@ require("fmt", {
 ## 2. Detect toolchains
 
 ```bash
-tpkg sdk detect
-tpkg sdk list
+rhodium sdk detect
+rhodium sdk list
 ```
 
 Choose a profile ID shown by `sdk list`, for example `windows-msvc-x64`.
@@ -40,30 +40,30 @@ Choose a profile ID shown by `sdk list`, for example `windows-msvc-x64`.
 ## 3. Restore dependencies
 
 ```bash
-tpkg restore --config debug --toolchain windows-msvc-x64
+rhodium restore --config debug --toolchain windows-msvc-x64
 ```
 
-This reads `tpkg.lua`, fetches dependency sources, builds dependencies if needed, writes or updates `tpkg.lock.toml`, and stores artifacts under `.tpkg/`.
+This reads `rhodium.lua`, fetches dependency sources, builds dependencies if needed, writes or updates `tpkg.lock.toml`, and stores artifacts under `.rhodium/`.
 
 ## 4. Generate CMake integration
 
 ```bash
-tpkg generate --config debug --toolchain windows-msvc-x64
+rhodium generate --config debug --toolchain windows-msvc-x64
 ```
 
 The default output is:
 
 ```text
-.tpkg/generated/cmake/
+.rhodium/generated/cmake/
 ```
 
 ## 5. Consume from CMake
 
 ```cmake
 cmake_minimum_required(VERSION 3.25)
-project(HelloTPKG LANGUAGES CXX)
+project(HelloRHODIUM LANGUAGES CXX)
 
-include("${CMAKE_SOURCE_DIR}/.tpkg/generated/cmake/tpkg_deps.cmake")
+include("${CMAKE_SOURCE_DIR}/.rhodium/generated/cmake/rhodiumConfig.cmake")
 
 add_executable(hello src/main.cpp)
 target_link_libraries(hello PRIVATE fmt)
@@ -74,7 +74,7 @@ target_link_libraries(hello PRIVATE fmt)
 Commit:
 
 ```text
-tpkg.lua
+rhodium.lua
 tpkg.lock.toml
 CMakeLists.txt
 ```
@@ -82,7 +82,7 @@ CMakeLists.txt
 Do not commit:
 
 ```text
-.tpkg/
+.rhodium/
 ```
 
 ## Next steps

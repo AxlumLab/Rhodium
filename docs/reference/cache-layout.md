@@ -5,10 +5,12 @@
 -->
 # Cache layout
 
-Toolkit Package Manager uses `.tpkg/` for local generated state.
+Rhodium uses `.rhodium/` for new local generated state. If `.rhodium/` is absent and a legacy `.tpkg/` directory exists, it reuses `.tpkg/` without moving or copying it. If both exist, `.rhodium/` takes precedence. All cache, artifact, toolchain, override, generation, and clean operations use the selected directory. `clean --all` removes only that selected directory.
+
+The same directory selection applies to user-level toolchains under the home directory. Internal cache structure, marker filenames, and artifact ID generation remain unchanged.
 
 ```text
-.tpkg/
+.rhodium/
   packages/          dependency source cache
   build-packages/    dependency build workspaces
   artifacts/         exported artifacts

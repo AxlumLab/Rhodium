@@ -3,7 +3,7 @@ set -euo pipefail
 
 build_type="${BUILD_TYPE:-Release}"
 generator="${GENERATOR:-Ninja}"
-vcpkg_root="${TKB_VCPKG_ROOT:-${VCPKG_ROOT:-}}"
+vcpkg_root="${RHODIUM_VCPKG_ROOT:-${VCPKG_ROOT:-}}"
 vcpkg_triplet="${VCPKG_TARGET_TRIPLET:-x64-windows}"
 build_dir="${BUILD_DIR:-out/build/ninja-vcpkg-$vcpkg_triplet-$build_type}"
 
@@ -18,7 +18,7 @@ configure_args=(
 )
 
 if [[ -n "$vcpkg_root" ]]; then
-  configure_args+=("-DTKB_VCPKG_ROOT=$vcpkg_root")
+  configure_args+=("-DRHODIUM_VCPKG_ROOT=$vcpkg_root")
 fi
 
 if [[ -n "$vcpkg_triplet" ]]; then

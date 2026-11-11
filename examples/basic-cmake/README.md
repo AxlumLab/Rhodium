@@ -5,11 +5,11 @@
 -->
 # basic-cmake
 
-Minimal CMake project using Toolkit Package Manager generated dependency integration.
+Minimal CMake project using Rhodium generated dependency integration.
 
 ```bash
-tpkg restore --root examples/basic-cmake --toolchain <id>
-tpkg generate --root examples/basic-cmake --toolchain <id>
+rhodium restore --root examples/basic-cmake --toolchain <id>
+rhodium generate --root examples/basic-cmake --toolchain <id>
 cmake -S examples/basic-cmake -B build/basic-cmake -G Ninja
 cmake --build build/basic-cmake
 ```

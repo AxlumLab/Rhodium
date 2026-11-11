@@ -9,7 +9,7 @@ This snapshot performs the low-risk maintenance preparation work and packages th
 
 ## Completed in this snapshot
 
-- Added root `README.md` with corrected project positioning: Toolkit Package Manager is a dependency manager for CMake projects, not a general build system.
+- Added root `README.md` with corrected project positioning: Rhodium is a dependency manager for CMake projects, not a general build system.
 - Added standard project files:
   - `CONTRIBUTING.md`
   - `CODE_OF_CONDUCT.md`
@@ -19,7 +19,7 @@ This snapshot performs the low-risk maintenance preparation work and packages th
   - `AGENTS.md`
 - Removed stale/incomplete refactor artifacts from the implementation tree.
 - Fixed `.gitignore` formatting and expanded local/generated ignores.
-- Reworked `cmake/ToolkitPkgTargets.cmake` to collect source files by module groups instead of one repository-wide source glob.
+- Reworked `cmake/RhodiumTargets.cmake` to collect source files by module groups instead of one repository-wide source glob.
 - Added documentation structure under `docs/`:
   - user guides
   - DSL guides

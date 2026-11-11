@@ -1,6 +1,6 @@
 # Source types
 
-Toolkit Package Manager can restore dependencies from Git, archives, and local paths.
+Rhodium can restore dependencies from Git, archives, and local paths.
 
 ## Git source
 

@@ -93,7 +93,7 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-          TKB_VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          RHODIUM_VCPKG_ROOT: ${{ github.workspace }}/vcpkg
         run: bash scripts/build.sh
 
       - name: Install package
@@ -111,7 +111,7 @@ jobs:
         if: steps.install_package.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: tpkg-${{ matrix.slug }}-${{ matrix.build_type }}
+          name: rhodium-${{ matrix.slug }}-${{ matrix.build_type }}
           path: ${{ env.INSTALL_DIR }}
           if-no-files-found: error
 

@@ -2,7 +2,7 @@ param(
     [string]$BuildDir = "",
     [string]$BuildType = "Release",
     [string]$Generator = "Ninja",
-    [string]$VcpkgRoot = $(if ($env:TKB_VCPKG_ROOT) { $env:TKB_VCPKG_ROOT } else { $env:VCPKG_ROOT }),
+    [string]$VcpkgRoot = $(if ($env:RHODIUM_VCPKG_ROOT) { $env:RHODIUM_VCPKG_ROOT } else { $env:VCPKG_ROOT }),
     [string]$VcpkgTriplet = $(if ($env:VCPKG_TARGET_TRIPLET) { $env:VCPKG_TARGET_TRIPLET } else { "x64-windows" })
 )
 
@@ -30,7 +30,7 @@ Push-Location $repo
 try {
     $configureArgs = @("-S", ".", "-B", $BuildDir, "-G", $Generator, "-DCMAKE_BUILD_TYPE=$BuildType")
     if (-not [string]::IsNullOrWhiteSpace($VcpkgRoot)) {
-        $configureArgs += "-DTKB_VCPKG_ROOT=$VcpkgRoot"
+        $configureArgs += "-DRHODIUM_VCPKG_ROOT=$VcpkgRoot"
     }
     if (-not [string]::IsNullOrWhiteSpace($VcpkgTriplet)) {
         $configureArgs += "-DVCPKG_TARGET_TRIPLET=$VcpkgTriplet"

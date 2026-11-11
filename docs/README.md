@@ -3,6 +3,6 @@
  * @LastEditors: cubevlmu khfahqp@gmail.com
  * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
 -->
-# Toolkit Package Manager documentation
+# Rhodium documentation
 
 Use [INDEX.md](INDEX.md) as the documentation entry point.

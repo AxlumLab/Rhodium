@@ -2,6 +2,6 @@
 
 int main()
 {
-    fmt::print("Hello from Toolkit Package Manager example.\n");
+    fmt::print("Hello from Rhodium example.\n");
     return 0;
 }
