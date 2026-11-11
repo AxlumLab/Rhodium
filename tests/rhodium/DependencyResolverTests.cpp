@@ -559,6 +559,7 @@ int value() {
     {
         const auto dir = makeTempDir();
         const auto repo = dir / "BranchSource";
+        writeText(repo / ".gitattributes", "* text eol=lf\n");
         writeText(repo / "include/value.hpp", "first\n");
         std::string output;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "init"}, output)) << output;
