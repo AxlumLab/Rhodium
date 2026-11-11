@@ -2,13 +2,13 @@
 
 ## Dependency manager, not build system
 
-Toolkit Package Manager manages dependencies for CMake projects. It may build third-party dependency packages as part of restore, but it does not replace your project build graph.
+Rhodium manages dependencies for CMake projects. It may build third-party dependency packages as part of restore, but it does not replace your project build graph.
 
 Your application or library remains a CMake project.
 
 ## Manifest
 
-`tpkg.lua` declares the dependency graph, source locations, build method, artifacts, and platform-specific overrides.
+`rhodium.lua` declares the dependency graph, source locations, build method, artifacts, and platform-specific overrides.
 
 ## Lockfile
 
@@ -16,19 +16,19 @@ Your application or library remains a CMake project.
 
 ## Package source cache
 
-`.tpkg/packages/` stores fetched dependency sources.
+`.rhodium/packages/` stores fetched dependency sources.
 
 ## Package build cache
 
-`.tpkg/build-packages/` stores dependency build workspaces.
+`.rhodium/build-packages/` stores dependency build workspaces.
 
 ## Artifact cache
 
-`.tpkg/artifacts/` stores exported dependency artifacts used by generated CMake integration files.
+`.rhodium/artifacts/` stores exported dependency artifacts used by generated CMake integration files.
 
 ## Generated CMake integration
 
-`tpkg generate` writes CMake files under `.tpkg/generated/cmake/` by default. Your `CMakeLists.txt` includes the generated file and links the imported targets or libraries it defines.
+`rhodium generate` writes CMake files under `.rhodium/generated/cmake/` by default. Your `CMakeLists.txt` includes the generated file and links the imported targets or libraries it defines.
 
 ## Toolchain profile
 

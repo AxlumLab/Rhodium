@@ -5,16 +5,16 @@ Local overrides redirect dependency sources to local working directories.
 ## Command-line override
 
 ```bash
-tpkg restore --override fmt=../fmt-fork
+rhodium restore --override fmt=../fmt-fork
 ```
 
 ## Persistent local override
 
 ```bash
-tpkg override set fmt ../fmt-fork
-tpkg override list
-tpkg override remove fmt
-tpkg override clear
+rhodium override set fmt ../fmt-fork
+rhodium override list
+rhodium override remove fmt
+rhodium override clear
 ```
 
 Overrides are local development state and should not be committed.

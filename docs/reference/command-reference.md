@@ -3,31 +3,31 @@
 ## Global options
 
 ```bash
-tpkg [--root <path>] <command> [options]
+rhodium [--root <path>] <command> [options]
 ```
 
 | Option | Meaning |
 | --- | --- |
-| `--root <path>` | Workspace root containing `tpkg.lua` |
+| `--root <path>` | Workspace root containing `rhodium.lua` |
 | `--help` | Show help |
 
 ## `doctor`
 
-Check the local Toolkit Package Manager runtime.
+Check the local Rhodium runtime.
 
 ```bash
-tpkg doctor
-tpkg doctor --sdk
+rhodium doctor
+rhodium doctor --sdk
 ```
 
 `--sdk` prints detailed SDK and toolchain diagnostics.
 
 ## `load`
 
-Load and validate `tpkg.lua`.
+Load and validate `rhodium.lua`.
 
 ```bash
-tpkg load
+rhodium load
 ```
 
 Use this before restore when checking DSL syntax and model validation.
@@ -37,7 +37,7 @@ Use this before restore when checking DSL syntax and model validation.
 Print the loaded dependency model as JSON.
 
 ```bash
-tpkg dump-model
+rhodium dump-model
 ```
 
 ## `deps`
@@ -45,7 +45,7 @@ tpkg dump-model
 Print dependencies declared in the manifest.
 
 ```bash
-tpkg deps
+rhodium deps
 ```
 
 ## `generate`
@@ -53,14 +53,14 @@ tpkg deps
 Generate CMake dependency integration files.
 
 ```bash
-tpkg generate [options]
+rhodium generate [options]
 ```
 
 | Option | Meaning |
 | --- | --- |
 | `--toolchain <id>` | Preferred local toolchain profile ID |
 | `--config <debug|release>` | Build config |
-| `--output <dir>` | Output directory; default `.tpkg/generated/cmake` |
+| `--output <dir>` | Output directory; default `<active-state>/generated/cmake` (`.rhodium/`, or existing legacy `.tpkg/`) |
 | `--override <name=path>` | Override dependency source |
 
 ## `restore`
@@ -68,7 +68,7 @@ tpkg generate [options]
 Prepare package cache, build/export dependency artifacts, and update lock state.
 
 ```bash
-tpkg restore [package] [options]
+rhodium restore [package] [options]
 ```
 
 | Option | Meaning |
@@ -87,7 +87,7 @@ tpkg restore [package] [options]
 Update package lock entries.
 
 ```bash
-tpkg update [package] [options]
+rhodium update [package] [options]
 ```
 
 | Option | Meaning |
@@ -103,8 +103,8 @@ tpkg update [package] [options]
 Print restored package cache and artifact status.
 
 ```bash
-tpkg packages
-tpkg packages --verbose
+rhodium packages
+rhodium packages --verbose
 ```
 
 | Option | Meaning |
@@ -117,7 +117,7 @@ tpkg packages --verbose
 Garbage collect unreferenced package caches.
 
 ```bash
-tpkg packages gc [options]
+rhodium packages gc [options]
 ```
 
 | Option | Meaning |
@@ -134,7 +134,7 @@ tpkg packages gc [options]
 Display dependency tree.
 
 ```bash
-tpkg tree
+rhodium tree
 ```
 
 ## `clean`
@@ -142,15 +142,15 @@ tpkg tree
 Clean dependency cache and generated integration files.
 
 ```bash
-tpkg clean [package] [options]
+rhodium clean [package] [options]
 ```
 
 | Option | Meaning |
 | --- | --- |
 | `package` | Optional dependency to clean |
-| `--all` | Remove the whole `.tpkg` directory |
-| `--artifacts` | Remove `.tpkg/artifacts` |
-| `--sources` | Remove `.tpkg/packages` source cache |
+| `--all` | Remove the active state directory (`.rhodium` or legacy `.tpkg`) |
+| `--artifacts` | Remove `.rhodium/artifacts` |
+| `--sources` | Remove `.rhodium/packages` source cache |
 | `--lock` | Remove `tpkg.lock.toml` |
 
 ## `override`
@@ -158,10 +158,10 @@ tpkg clean [package] [options]
 Manage local dependency overrides.
 
 ```bash
-tpkg override list
-tpkg override set <name> <path>
-tpkg override remove <name>
-tpkg override clear
+rhodium override list
+rhodium override set <name> <path>
+rhodium override remove <name>
+rhodium override clear
 ```
 
 ## `sdk`
@@ -171,27 +171,27 @@ Detect and inspect local SDK/toolchains.
 ### `sdk detect`
 
 ```bash
-tpkg sdk detect
+rhodium sdk detect
 ```
 
-Detect SDK/toolchains and write `.tpkg/toolchains/host.toml`.
+Detect SDK/toolchains and write `.rhodium/toolchains/host.toml`.
 
 ### `sdk list`
 
 ```bash
-tpkg sdk list [--refresh] [--source auto|project-user|workspace|global-user]
+rhodium sdk list [--refresh] [--source auto|project-user|workspace|global-user]
 ```
 
 ### `sdk show`
 
 ```bash
-tpkg sdk show <id>
+rhodium sdk show <id>
 ```
 
 ### `sdk add`
 
 ```bash
-tpkg sdk add <id> [options]
+rhodium sdk add <id> [options]
 ```
 
 Common options:
@@ -234,14 +234,14 @@ Common options:
 ### `sdk remove`
 
 ```bash
-tpkg sdk remove <id> [--source project-user|global-user]
+rhodium sdk remove <id> [--source project-user|global-user]
 ```
 
 ### Other SDK commands
 
 ```bash
-tpkg sdk doctor
-tpkg sdk dump
-tpkg sdk select <id>
-tpkg sdk clear
+rhodium sdk doctor
+rhodium sdk dump
+rhodium sdk select <id>
+rhodium sdk clear
 ```

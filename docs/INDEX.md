@@ -3,9 +3,9 @@
  * @LastEditors: cubevlmu khfahqp@gmail.com
  * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
 -->
-# Toolkit Package Manager documentation
+# Rhodium documentation
 
-Toolkit Package Manager is a dependency management system for C/C++ projects that use CMake. It restores dependencies, builds dependency artifacts when needed, records reproducible lock state, and generates CMake integration files.
+Rhodium is a dependency management system for C/C++ projects that use CMake. It restores dependencies, builds dependency artifacts when needed, records reproducible lock state, and generates CMake integration files.
 
 It is not a general build system. Your project still uses CMake and a native backend such as Ninja, Visual Studio, or Xcode.
 
@@ -65,7 +65,7 @@ It is not a general build system. Your project still uses CMake and a native bac
 
 ## Stability levels
 
-Toolkit Package Manager documentation uses these labels:
+Rhodium documentation uses these labels:
 
 - **Stable**: intended for normal users and should not change without migration notes.
 - **Experimental**: usable, but behavior or fields may change.

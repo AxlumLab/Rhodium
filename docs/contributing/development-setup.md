@@ -25,9 +25,9 @@ cmake --build build
 ## Local validation commands
 
 ```bash
-tpkg doctor
-tpkg load --root examples/basic-cmake
-tpkg dump-model --root examples/basic-cmake
+rhodium doctor
+rhodium load --root examples/basic-cmake
+rhodium dump-model --root examples/basic-cmake
 ```
 
 Automated agents should not run these commands unless explicitly instructed by the project owner.

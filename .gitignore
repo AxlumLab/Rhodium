@@ -1,4 +1,5 @@
 # Local dependency/cache state
+.rhodium/
 .tpkg/
 tpkg.lock.toml
 
@@ -13,6 +14,7 @@ cmake-build-*/
 .idea/
 .codegraph/
 .clangd
+.agents
 compile_commands.json
 
 # Local references and generated packages

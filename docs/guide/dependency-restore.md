@@ -3,16 +3,16 @@
 `restore` is the main dependency preparation command.
 
 ```bash
-tpkg restore [package] [options]
+rhodium restore [package] [options]
 ```
 
 ## Common usage
 
 ```bash
-tpkg restore
-tpkg restore --config release
-tpkg restore --toolchain windows-msvc-x64
-tpkg restore fmt
+rhodium restore
+rhodium restore --config release
+rhodium restore --toolchain windows-msvc-x64
+rhodium restore fmt
 ```
 
 ## Reproducible restore
@@ -20,7 +20,7 @@ tpkg restore fmt
 Use the lockfile exactly:
 
 ```bash
-tpkg restore --locked
+rhodium restore --locked
 ```
 
 `--locked` should not update `tpkg.lock.toml`.
@@ -30,19 +30,19 @@ tpkg restore --locked
 Build a dependency workspace without exporting artifacts:
 
 ```bash
-tpkg restore dxc --build-only
+rhodium restore dxc --build-only
 ```
 
 Export artifacts from an already-built workspace:
 
 ```bash
-tpkg restore dxc --export-only
+rhodium restore dxc --export-only
 ```
 
 Force a clean dependency build workspace:
 
 ```bash
-tpkg restore dxc --rebuild
+rhodium restore dxc --rebuild
 ```
 
 ## Restore outputs
@@ -50,8 +50,8 @@ tpkg restore dxc --rebuild
 Restore may update:
 
 ```text
-.tpkg/packages/
-.tpkg/build-packages/
-.tpkg/artifacts/
+.rhodium/packages/
+.rhodium/build-packages/
+.rhodium/artifacts/
 tpkg.lock.toml
 ```

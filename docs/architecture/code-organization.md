@@ -7,7 +7,7 @@ This document defines the intended source layout after the maintenance refactor.
 Current target structure:
 
 ```text
-src/tpkg/cli/
+src/rhodium/cli/
   CommandLine.hpp
   CommandLine.cpp
   CommandContext.hpp
@@ -35,7 +35,7 @@ src/tpkg/cli/
 Target structure:
 
 ```text
-src/tpkg/toolchain/
+src/rhodium/toolchain/
   ToolchainDetector.hpp
   ToolchainDetector.cpp
   ToolchainProbe.hpp
@@ -52,7 +52,7 @@ Split by platform because environment variables, SDK paths, compiler families, a
 Target structure:
 
 ```text
-src/tpkg/resolve/
+src/rhodium/resolve/
   DependencyResolver.hpp
   DependencyResolver.cpp
   DependencyGraph.hpp
@@ -74,7 +74,7 @@ src/tpkg/resolve/
 Target structure:
 
 ```text
-src/tpkg/script/
+src/rhodium/script/
   LuaBindings.hpp
   LuaBindings.cpp
   LuaValueReader.hpp
@@ -96,7 +96,7 @@ src/tpkg/script/
 Target structure:
 
 ```text
-src/tpkg/package/
+src/rhodium/package/
   PackageBuilderUtil.hpp
   PackageBuilderUtil.cpp
   BuildVariableExpander.hpp

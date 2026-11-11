@@ -5,11 +5,11 @@
 -->
 # Basic workflow
 
-A normal Toolkit Package Manager workflow has four steps.
+A normal Rhodium workflow has four steps.
 
 ## 1. Write the manifest
 
-Create `tpkg.lua` in the CMake project root.
+Create `rhodium.lua` in the CMake project root.
 
 ```lua
 package("MyProject")
@@ -33,17 +33,17 @@ require("fmt", {
 ## 2. Detect or select a toolchain
 
 ```bash
-tpkg sdk detect
-tpkg sdk list
-tpkg sdk select windows-msvc-x64
+rhodium sdk detect
+rhodium sdk list
+rhodium sdk select windows-msvc-x64
 ```
 
-The selected toolchain is stored in local `.tpkg` state and should not be committed.
+The selected toolchain is stored in local `.rhodium` state and should not be committed.
 
 ## 3. Restore dependencies
 
 ```bash
-tpkg restore --config debug
+rhodium restore --config debug
 ```
 
 This fetches sources, builds dependency packages if needed, exports artifacts, and updates `tpkg.lock.toml`.
@@ -51,7 +51,7 @@ This fetches sources, builds dependency packages if needed, exports artifacts, a
 ## 4. Generate CMake files
 
 ```bash
-tpkg generate --config debug
+rhodium generate --config debug
 ```
 
 Then include the generated file from your CMake project.
@@ -61,7 +61,7 @@ Then include the generated file from your CMake project.
 Commit:
 
 ```text
-tpkg.lua
+rhodium.lua
 tpkg.lock.toml
 docs explaining required toolchains
 ```
@@ -69,5 +69,5 @@ docs explaining required toolchains
 Ignore:
 
 ```text
-.tpkg/
+.rhodium/
 ```

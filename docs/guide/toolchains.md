@@ -5,32 +5,32 @@ A toolchain profile describes the local compiler, linker, SDK, and helper tools 
 ## Detect profiles
 
 ```bash
-tpkg sdk detect
-tpkg sdk list
+rhodium sdk detect
+rhodium sdk list
 ```
 
 ## Show a profile
 
 ```bash
-tpkg sdk show windows-msvc-x64
+rhodium sdk show windows-msvc-x64
 ```
 
 ## Save a preferred profile
 
 ```bash
-tpkg sdk select windows-msvc-x64
+rhodium sdk select windows-msvc-x64
 ```
 
 Clear it with:
 
 ```bash
-tpkg sdk clear
+rhodium sdk clear
 ```
 
 ## Register a profile manually
 
 ```bash
-tpkg sdk add android-arm64 \
+rhodium sdk add android-arm64 \
   --platform android \
   --compiler-kind clang \
   --target-arch arm64 \
@@ -46,8 +46,8 @@ Use `--force` to replace an existing profile with the same ID.
 ## Diagnostics
 
 ```bash
-tpkg sdk doctor
-tpkg doctor --sdk
+rhodium sdk doctor
+rhodium doctor --sdk
 ```
 
 Use diagnostics when a package build cannot find a compiler, CMake, Ninja, Git, Android SDK, NDK, JDK, or system library path.

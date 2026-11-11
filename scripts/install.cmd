@@ -11,7 +11,7 @@ set "BUILD_DIR=%BUILD_DIR%"
 if "%BUILD_DIR%"=="" set "BUILD_DIR=out\build\ninja-vcpkg-%VCPKG_TRIPLET%-%BUILD_TYPE%"
 
 set "INSTALL_PREFIX=%INSTALL_PREFIX%"
-if "%INSTALL_PREFIX%"=="" set "INSTALL_PREFIX=out\install\tpkg"
+if "%INSTALL_PREFIX%"=="" set "INSTALL_PREFIX=out\install\rhodium"
 
 pushd "%~dp0.."
 if errorlevel 1 exit /b 1

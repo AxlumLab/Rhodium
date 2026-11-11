@@ -1,6 +1,6 @@
 # Installation
 
-Toolkit Package Manager is currently distributed as a development executable from this repository.
+Rhodium is currently distributed as a development executable from this repository.
 
 ## Requirements
 
@@ -11,7 +11,7 @@ Required for normal use:
 - A C/C++ toolchain for the target platform.
 - Ninja is recommended for dependency builds.
 
-Required for building Toolkit Package Manager itself:
+Required for building Rhodium itself:
 
 - CMake 3.25 or newer.
 - A C++20 compiler.
@@ -19,7 +19,7 @@ Required for building Toolkit Package Manager itself:
 
 ## Platform status
 
-Toolkit Package Manager is designed to be cross-platform as a dependency manager.
+Rhodium is designed to be cross-platform as a dependency manager.
 
 Current validation status:
 
@@ -36,10 +36,10 @@ Current validation status:
 After building the executable, add the output directory to `PATH` or call it with an absolute path.
 
 ```bash
-tpkg --help
-tpkg doctor
+rhodium --help
+rhodium doctor
 ```
 
 ## Project-local usage
 
-For reproducible project workflows, prefer documenting the exact `tpkg` version or commit used by the project.
+For reproducible project workflows, prefer documenting the exact `rhodium` version or commit used by the project.

@@ -1,12 +1,16 @@
-# Toolkit Package Manager
+# Rhodium
 
-Toolkit Package Manager is a cross-platform C/C++ dependency management system designed to serve CMake projects.
+Repository: https://github.com/AxlumLab/Rhodium.git
+
+Rhodium is a cross-platform C/C++ dependency management system designed to serve CMake projects.
 
 It is **not** a replacement for CMake, Ninja, Visual Studio, Xcode, or any native build backend. Its job is to restore source, archive, local, or prebuilt dependencies; build dependency artifacts when needed; write a lock file for reproducibility; and generate CMake integration files that your normal CMake project can consume.
 
+The executable is `rhodium` (`rhodium.exe` on Windows). Rhodium reads `rhodium.lua` first and falls back to `tpkg.lua`. State uses an existing `.rhodium/` first, otherwise an existing `.tpkg/`, otherwise a new `.rhodium/`. Lockfiles remain `tpkg.lock.toml`. Generated CMake packages and imported targets use `rhodium` and `rhodium::`.
+
 ## Project status
 
-Toolkit Package Manager is under active development.
+Rhodium is under active development.
 
 Current validation scope:
 
@@ -20,26 +24,26 @@ Current validation scope:
 
 ```bash
 # Check the local environment
-tpkg doctor
+rhodium doctor
 
 # Detect local C/C++ and platform toolchains
-tpkg sdk detect
-tpkg sdk list
+rhodium sdk detect
+rhodium sdk list
 
 # Restore dependency sources and artifacts
-tpkg restore --config debug --toolchain windows-msvc-x64
+rhodium restore --config debug --toolchain windows-msvc-x64
 
 # Generate CMake integration files
-tpkg generate --config debug --toolchain windows-msvc-x64
+rhodium generate --config debug --toolchain windows-msvc-x64
 ```
 
 A normal project keeps using CMake:
 
 ```cmake
-include("${CMAKE_SOURCE_DIR}/.tpkg/generated/cmake/tpkg_deps.cmake")
+include("${CMAKE_SOURCE_DIR}/.rhodium/generated/cmake/rhodiumConfig.cmake")
 ```
 
-## Minimal `tpkg.deps.lua`
+## Minimal `rhodium.lua`
 
 ```lua
 package("ExampleApp")
@@ -80,7 +84,7 @@ Start here:
 ## Repository layout
 
 ```text
-src/tpkg/          Toolkit Package Manager implementation
+src/rhodium/          Rhodium implementation
 cmake/             CMake project glue
 docs/              User, reference, architecture, and contributor docs
 examples/          Example dependency manifests and project layouts

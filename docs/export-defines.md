@@ -32,7 +32,7 @@ require("spdlog", {
 })
 ```
 
-Generated CMake target `tpkg::spdlog` will have:
+Generated CMake target `rhodium::spdlog` will have:
 - ✅ Include directories
 - ✅ Libraries to link
 - ❌ NO defines exported
@@ -113,8 +113,8 @@ require("spdlog", {
 
 **With `export_defines = false`**:
 ```cmake
-add_library(tpkg::spdlog INTERFACE IMPORTED)
-set_target_properties(tpkg::spdlog PROPERTIES
+add_library(rhodium::spdlog INTERFACE IMPORTED)
+set_target_properties(rhodium::spdlog PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "/path/to/include"
     INTERFACE_COMPILE_DEFINITIONS ""  # Empty!
     INTERFACE_LINK_LIBRARIES "..."
@@ -123,8 +123,8 @@ set_target_properties(tpkg::spdlog PROPERTIES
 
 **With `export_defines = true`**:
 ```cmake
-add_library(tpkg::my-lib INTERFACE IMPORTED)
-set_target_properties(tpkg::my-lib PROPERTIES
+add_library(rhodium::my-lib INTERFACE IMPORTED)
+set_target_properties(rhodium::my-lib PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "/path/to/include"
     INTERFACE_COMPILE_DEFINITIONS "MY_MACRO=1;ANOTHER_MACRO"
     INTERFACE_LINK_LIBRARIES "..."

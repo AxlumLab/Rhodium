@@ -1,11 +1,11 @@
 # Architecture overview
 
-Toolkit Package Manager is organized around a narrow responsibility: restore dependencies for CMake projects and generate CMake integration files.
+Rhodium is organized around a narrow responsibility: restore dependencies for CMake projects and generate CMake integration files.
 
 ## Main flow
 
 ```text
-tpkg.lua
+rhodium.lua
   -> script loader
   -> build model
   -> dependency resolver

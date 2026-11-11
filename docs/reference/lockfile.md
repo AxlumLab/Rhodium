@@ -9,18 +9,18 @@ Commit `tpkg.lock.toml` for applications and projects that need reproducible dep
 ## Locked restore
 
 ```bash
-tpkg restore --locked
+rhodium restore --locked
 ```
 
 A locked restore should use existing lock entries and should not update the lockfile.
 
 ## Update policy
 
-Use `tpkg update` when intentionally changing lock state.
+Use `rhodium update` when intentionally changing lock state.
 
 ```bash
-tpkg update fmt
-tpkg restore fmt
+rhodium update fmt
+rhodium restore fmt
 ```
 
 ## Do not hand-edit by default
