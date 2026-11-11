@@ -15,6 +15,7 @@
 namespace rhodium
 {
     class DiagnosticSink;
+    class ToolchainSnapshot;
 }
 
 namespace rhodium
@@ -42,6 +43,7 @@ namespace rhodium
             std::string git;
             std::filesystem::path workspaceRoot;
             std::map<std::string, std::string> environment;
+            ToolchainSnapshot *toolchains = nullptr;
         };
 
         static bool toolchain(Context &context,

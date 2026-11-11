@@ -4,11 +4,14 @@
  * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
+#include "rhodium/core/WorkspaceLock.hpp"
+
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/package/GitFetcher.hpp"
 #include "rhodium/package/PackageCache.hpp"
+#include "rhodium/package/ToolchainContextResolver.hpp"
 #include "rhodium/resolve/DependencyResolver.hpp"
 
 #include <fmt/format.h>
@@ -59,6 +62,11 @@ namespace rhodium
         auto startTime = std::chrono::steady_clock::now();
 
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         if (buildOnly && exportOnly)
         {
             diagnostics.error("restore --build-only and --export-only cannot be used together");
@@ -116,6 +124,8 @@ namespace rhodium
 
         DependencyResolver resolver;
         DependencyRestoreOptions options;
+        ToolchainSnapshot toolchains(workspaceRoot, {selectedToolchain});
+        options.toolchains = &toolchains;
         options.locked = locked;
         options.packageName = packageName;
         options.buildOnly = buildOnly;

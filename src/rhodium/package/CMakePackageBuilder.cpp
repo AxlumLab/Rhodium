@@ -65,6 +65,7 @@ namespace rhodium
             {},
         };
         context.workspaceRoot = workspaceRoot;
+        context.toolchains = options.toolchains;
         if (!BuildUtil::toolchain(context, preferredToolchain, dependency.toolchainRequirements, &diagnostics))
         {
             return false;

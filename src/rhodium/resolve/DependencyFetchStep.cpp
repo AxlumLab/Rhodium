@@ -49,7 +49,8 @@ namespace rhodium
             result.commit = archiveResult.archiveHash;
             result.sourceRoot = archiveResult.sourceDir;
 
-            if (locked)
+            if (locked && !wantsUpdate && !context.options.rebuild &&
+                !context.options.buildOnly && !context.options.exportOnly)
             {
                 LockedPackage expected = LockedPackage::from(dependency,
                                                               result.commit,
@@ -60,15 +61,6 @@ namespace rhodium
                 if (DepExport::reusable(*locked, expected, Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
                 {
                     diagnostics.info("package artifact is up to date; skipping archive build: " + dependency.name);
-                    if (!DepExport::gc(context.lockFile,
-                                       context.workspaceRoot,
-                                       context.effectiveConfig,
-                                       context.preferredToolchain,
-                                       dependency.name,
-                                       diagnostics))
-                    {
-                        return false;
-                    }
                     result.skipPackage = true;
                 }
             }
@@ -88,7 +80,8 @@ namespace rhodium
                 return true;
             }
 
-            if (locked && !result.commit.empty() && !wantsUpdate)
+            if (locked && !result.commit.empty() && !wantsUpdate &&
+                !context.options.rebuild && !context.options.buildOnly)
             {
                 LockedPackage expected = LockedPackage::from(dependency,
                                                               result.commit,
@@ -99,15 +92,6 @@ namespace rhodium
                 if (DepExport::reusable(*locked, expected, Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
                 {
                     diagnostics.info("package artifact is up to date; skipping git sync and build: " + dependency.name);
-                    if (!DepExport::gc(context.lockFile,
-                                       context.workspaceRoot,
-                                       context.effectiveConfig,
-                                       context.preferredToolchain,
-                                       dependency.name,
-                                       diagnostics))
-                    {
-                        return false;
-                    }
                     result.skipPackage = true;
                     return true;
                 }
@@ -117,7 +101,7 @@ namespace rhodium
             auto initialPath = stableSourcePath;
             if (!File::dir(initialPath / ".git"))
             {
-                const auto reusablePath = reusable(context.cache, dependency, initialPath);
+                const auto reusablePath = reusable(context, dependency, initialPath);
                 if (!reusablePath.empty())
                 {
                     initialPath = reusablePath;
@@ -131,12 +115,11 @@ namespace rhodium
             {
                 fetchDependency.ref = result.commit;
             }
-            if (!context.git.fetch(fetchDependency, initialPath, result.commit, diagnostics))
+            if (!context.git.fetch(fetchDependency, initialPath, result.commit, diagnostics, wantsUpdate))
             {
                 return false;
             }
             result.sourceRoot = initialPath;
-            removeSiblings(context.cache, dependency, result.sourceRoot, diagnostics);
             return true;
         }
 
@@ -154,10 +137,11 @@ namespace rhodium
         return path;
     }
 
-    std::filesystem::path DepFetch::reusable(const PackageCache &cache,
+    std::filesystem::path DepFetch::reusable(const Context &context,
                                              const DependencyDesc &dependency,
                                              const std::filesystem::path &preferredPath)
     {
+        const auto &cache = context.cache;
         if (File::dir(preferredPath / ".git"))
         {
             return preferredPath;
@@ -178,12 +162,28 @@ namespace rhodium
             {
                 return {};
             }
-            if (!entry.is_directory(ec))
+            if (!entry.is_directory(ec) || entry.is_symlink(ec))
             {
                 continue;
             }
             const auto path = entry.path();
             if (!File::dir(path / ".git"))
+            {
+                continue;
+            }
+            bool referenced = false;
+            const auto ref = path.lexically_relative(sourceRoot).generic_string();
+            for (const auto &lockedEntry : context.lockFile.packages)
+            {
+                const auto entryRef = lockedEntry.ref.empty() ? std::string("head") : lockedEntry.ref;
+                if (lockedEntry.name == dependency.name && lockedEntry.sourceType == "git" &&
+                    Path::sanitizePackagePath(entryRef) == ref)
+                {
+                    referenced = true;
+                    break;
+                }
+            }
+            if (referenced)
             {
                 continue;
             }
@@ -221,48 +221,6 @@ namespace rhodium
             return;
         }
         diagnostics.info("moved package source cache to " + to.string());
-    }
-
-    void DepFetch::removeSiblings(const PackageCache &cache,
-                                  const DependencyDesc &dependency,
-                                  const std::filesystem::path &keepPath,
-                                  DiagnosticSink &diagnostics)
-    {
-        const auto sourceRoot = cache.sourceRoot(dependency);
-        std::error_code ec;
-        if (!std::filesystem::is_directory(sourceRoot, ec))
-        {
-            return;
-        }
-
-        for (const auto &entry : std::filesystem::directory_iterator(sourceRoot, ec))
-        {
-            if (ec)
-            {
-                diagnostics.warning("failed to scan package source cache: " + ec.message());
-                return;
-            }
-            if (!entry.is_directory(ec))
-            {
-                continue;
-            }
-            const auto path = entry.path();
-            if (path == keepPath || !File::dir(path / ".git"))
-            {
-                continue;
-            }
-
-            std::filesystem::remove_all(path, ec);
-            if (ec)
-            {
-                diagnostics.warning("failed to remove stale package source cache " + path.string() + ": " + ec.message());
-                ec.clear();
-            }
-            else
-            {
-                diagnostics.info("removed stale package source cache: " + path.string());
-            }
-        }
     }
 
     bool DepFetch::urlLike(const std::string &source)

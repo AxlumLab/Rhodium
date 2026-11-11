@@ -1,4 +1,7 @@
 #include "rhodium/core/Path.hpp"
+#include "rhodium/core/WorkspaceLock.hpp"
+#include "rhodium/core/FileSystem.hpp"
+#include "rhodium/package/ToolchainContextResolver.hpp"
 
 #include "rhodium/resolve/DependencyResolver.hpp"
 
@@ -14,6 +17,7 @@
 #include "rhodium/resolve/DependencyLockStep.hpp"
 
 #include <algorithm>
+#include <set>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -30,14 +34,34 @@ namespace rhodium
                                      const DependencyOverrideSet &overrides,
                                      const DependencyRestoreOptions &options) const
     {
+        if (options.exportOnly && options.rebuild)
+        {
+            diagnostics.error("restore --export-only cannot be combined with --rebuild");
+            return false;
+        }
+        if (options.locked && (options.updateAll || !options.updatePackage.empty()))
+        {
+            diagnostics.error("restore --locked cannot update dependency versions");
+            return false;
+        }
         const auto effectiveConfig = BuildConfig::normalize(config, model.workspace.defaultConfig);
         if (!BuildConfig::validate(effectiveConfig, diagnostics))
         {
             return false;
         }
 
-        PackageCache cache(Path::stateRoot(workspaceRoot) / "packages");
         std::string error;
+        if (!File::mkdir(workspaceRoot, &error))
+        {
+            diagnostics.error("failed to create workspace root: " + error);
+            return false;
+        }
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return false;
+        }
+        PackageCache cache(Path::stateRoot(workspaceRoot) / "packages");
         if (!cache.mkdir(&error))
         {
             diagnostics.error("failed to create source cache: " + error);
@@ -58,6 +82,12 @@ namespace rhodium
         }
 
         GitFetcher git;
+        ToolchainSnapshot localSnapshot(workspaceRoot);
+        auto restoreOptions = options;
+        if (!restoreOptions.toolchains)
+        {
+            restoreOptions.toolchains = &localSnapshot;
+        }
         bool processedSelectedPackage = false;
         for (const auto &originalDependency : allDependencies)
         {
@@ -69,8 +99,14 @@ namespace rhodium
                 std::vector<std::string> prefixPaths;
                 for (const auto &depName : dependency.dependencies)
                 {
+                    const auto activeOverride = overrides.overrides.find(depName);
                     for (const auto &entry : lockFile.packages)
                     {
+                        if (entry.overridden != (activeOverride != overrides.overrides.end()) ||
+                            (entry.overridden && entry.overridePath != activeOverride->second.path.string()))
+                        {
+                            continue;
+                        }
                         if (entry.name == depName &&
                             BuildConfig::normalize(entry.config) == BuildConfig::normalize(effectiveConfig) &&
                             entry.toolchainId == preferredToolchain)
@@ -113,7 +149,9 @@ namespace rhodium
                 dependency.ref.clear();
             }
             diagnostics.info("restoring package " + dependency.name + " from " + dependency.source + " build=" + dependency.buildType);
-            auto *locked = DepLock::find(lockFile, dependency, effectiveConfig, preferredToolchain);
+            auto lockDependency = dependency;
+            lockDependency.source = DepLock::source(workspaceRoot, dependency);
+            auto *locked = DepLock::find(lockFile, lockDependency, effectiveConfig, preferredToolchain);
             const bool wantsUpdate = !dependency.overridden &&
                                      (options.updateAll || (!options.updatePackage.empty() && options.updatePackage == dependency.name));
             const auto selectedPackage = !options.packageName.empty() ? options.packageName : options.updatePackage;
@@ -144,13 +182,17 @@ namespace rhodium
                 lockFile,
                 effectiveConfig,
                 preferredToolchain,
-                options};
+                restoreOptions};
             if (!DepFetch::source(dependency, locked, wantsUpdate, fetchContext, fetchResult, diagnostics))
             {
                 return false;
             }
             if (fetchResult.skipPackage)
             {
+                if (!options.locked)
+                {
+                    DepLock::store(lockFile, *locked, locked);
+                }
                 continue;
             }
 
@@ -158,10 +200,9 @@ namespace rhodium
             DepBuild::Context buildContext{
                 workspaceRoot,
                 cache,
-                lockFile,
                 effectiveConfig,
                 preferredToolchain,
-                options};
+                restoreOptions};
             if (!DepBuild::run(dependency,
                                fetchResult.sourceRoot,
                                fetchResult.commit,
@@ -175,6 +216,10 @@ namespace rhodium
             }
             if (buildResult.skipPackage)
             {
+                if (!options.locked)
+                {
+                    DepLock::store(lockFile, *locked, locked);
+                }
                 continue;
             }
 
@@ -182,14 +227,12 @@ namespace rhodium
             {
                 if (!options.locked)
                 {
-                    if (locked)
+                    if (locked && locked->buildHash == buildResult.updated.buildHash &&
+                        locked->artifactId == buildResult.updated.artifactId)
                     {
-                        *locked = buildResult.updated;
+                        buildResult.updated.artifacts = locked->artifacts;
                     }
-                    else
-                    {
-                        lockFile.packages.push_back(buildResult.updated);
-                    }
+                    DepLock::store(lockFile, std::move(buildResult.updated), locked);
                     if (!LockFile::write(lockPath, lockFile, diagnostics))
                     {
                         return false;
@@ -211,14 +254,8 @@ namespace rhodium
                 diagnostics.info("restore --locked used " + dependency.name + " commit=" + buildResult.updated.commit + " build_hash=" + buildResult.updated.buildHash);
                 continue;
             }
-            if (locked)
-            {
-                *locked = std::move(buildResult.updated);
-            }
-            else
-            {
-                lockFile.packages.push_back(std::move(buildResult.updated));
-            }
+            const auto newHash = buildResult.updated.buildHash;
+            DepLock::store(lockFile, std::move(buildResult.updated), locked);
 
             if (wantsUpdate)
             {
@@ -226,20 +263,13 @@ namespace rhodium
                                  " old_commit=" + (oldCommit.empty() ? "-" : oldCommit) +
                                  " new_commit=" + fetchResult.commit +
                                  " old_hash=" + (oldHash.empty() ? "-" : oldHash) +
-                                 " new_hash=" + (locked ? locked->buildHash : lockFile.packages.back().buildHash) +
+                                 " new_hash=" + newHash +
                                  " rebuild_artifact=yes");
             }
 
             if (!LockFile::write(lockPath, lockFile, diagnostics))
             {
                 return false;
-            }
-            if (!options.buildOnly)
-            {
-                if (!DepExport::gc(lockFile, workspaceRoot, effectiveConfig, preferredToolchain, dependency.name, diagnostics))
-                {
-                    return false;
-                }
             }
         }
 
@@ -258,7 +288,33 @@ namespace rhodium
             diagnostics.error("restore package is not declared: " + options.packageName);
             return false;
         }
-        return options.locked ? true : LockFile::write(lockPath, lockFile, diagnostics);
+        if (options.locked)
+        {
+            return true;
+        }
+        const auto selectedPackage = !options.packageName.empty() ? options.packageName : options.updatePackage;
+        if (selectedPackage.empty())
+        {
+            std::set<std::string> activeNames;
+            for (const auto &dependency : allDependencies)
+            {
+                activeNames.insert(dependency.name);
+            }
+            lockFile.packages.erase(std::remove_if(lockFile.packages.begin(), lockFile.packages.end(),
+                                                  [&](const LockedPackage &entry)
+                                                  {
+                                                      return activeNames.find(entry.name) == activeNames.end() &&
+                                                             BuildConfig::normalize(entry.config) == effectiveConfig &&
+                                                             (entry.toolchainId == preferredToolchain ||
+                                                              (!preferredToolchain.empty() && entry.toolchainId.empty() && effectiveConfig == "debug"));
+                                                  }),
+                                    lockFile.packages.end());
+        }
+        if (!LockFile::write(lockPath, lockFile, diagnostics))
+        {
+            return false;
+        }
+        return options.buildOnly || DepExport::gc(lockFile, workspaceRoot, effectiveConfig, preferredToolchain, selectedPackage, diagnostics);
     }
 
 } // namespace rhodium

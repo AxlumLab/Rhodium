@@ -5,6 +5,7 @@
  */
 
 #include "rhodium/core/FileSystem.hpp"
+#include "rhodium/core/AtomicFile.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -46,12 +47,12 @@ namespace rhodium
     {
         try
         {
-            if (std::filesystem::exists(path))
+            if (std::filesystem::is_regular_file(path))
             {
                 std::ifstream input(path, std::ios::binary);
                 std::ostringstream stream;
                 stream << input.rdbuf();
-                if (stream.str() == content)
+                if (input && !input.bad() && stream.str() == content)
                 {
                     return true;
                 }
@@ -60,9 +61,7 @@ namespace rhodium
             {
                 return false;
             }
-            std::ofstream output(path, std::ios::binary | std::ios::trunc);
-            output << content;
-            return output.good();
+            return AtomicFile::write(path, content, error);
         }
         catch (const std::exception &ex)
         {

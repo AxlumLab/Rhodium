@@ -50,6 +50,7 @@ namespace rhodium
         }
         BuildUtil::Context context{sourceDir, artifactDir, artifactDir, dependency.name, config, {}, {}};
         context.workspaceRoot = workspaceRoot;
+        context.toolchains = options.toolchains;
         if (!BuildUtil::materialize(context, requested, artifact.artifacts, diagnostics))
         {
             return false;

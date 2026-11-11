@@ -1,3 +1,5 @@
+#include "rhodium/core/WorkspaceLock.hpp"
+
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/DependencyOverrideFile.hpp"
@@ -13,6 +15,11 @@ namespace rhodium
     int Commands::overrideList(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LocalDependencyOverrides overrides;
         if (!DependencyOverrides::read(workspaceRoot, overrides, diagnostics))
         {
@@ -33,6 +40,11 @@ namespace rhodium
     int Commands::overrideSet(const std::filesystem::path &workspaceRoot, const std::string &name, const std::string &path)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         if (name.empty() || path.empty())
         {
             diagnostics.error("override set requires name and path");
@@ -72,6 +84,11 @@ namespace rhodium
     int Commands::overrideRemove(const std::filesystem::path &workspaceRoot, const std::string &name)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LocalDependencyOverrides overrides;
         if (!DependencyOverrides::read(workspaceRoot, overrides, diagnostics))
         {
@@ -89,6 +106,11 @@ namespace rhodium
     int Commands::overrideClear(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LocalDependencyOverrides overrides;
         if (!DependencyOverrides::write(workspaceRoot, overrides, diagnostics))
         {

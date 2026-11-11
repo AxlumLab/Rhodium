@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <map>
 #include <vector>
+#include <utility>
 
 namespace rhodium
 {
@@ -60,6 +61,39 @@ namespace rhodium
             }
             return profiles;
         }
+    }
+
+    ToolchainSnapshot::ToolchainSnapshot(std::filesystem::path workspaceRoot)
+        : workspaceRoot_(std::move(workspaceRoot))
+    {
+    }
+
+    ToolchainSnapshot::ToolchainSnapshot(std::filesystem::path workspaceRoot, std::vector<ToolchainProfile> profiles)
+        : workspaceRoot_(std::move(workspaceRoot)), profiles_(std::move(profiles)), loaded_(true)
+    {
+    }
+
+    const std::vector<ToolchainProfile> &ToolchainSnapshot::profiles(DiagnosticSink &diagnostics)
+    {
+        if (!loaded_)
+        {
+            profiles_ = availableProfiles(workspaceRoot_, diagnostics);
+            loaded_ = true;
+        }
+        return profiles_;
+    }
+
+    bool ToolchainSnapshot::preferredToolchain(std::string &value, DiagnosticSink &diagnostics)
+    {
+        if (!preferenceLoaded_)
+        {
+            LocalToolchainConfig config;
+            preferenceOk_ = workspaceRoot_.empty() || readLocalToolchainConfig(workspaceRoot_, config, diagnostics);
+            preferred_ = config.preferredToolchain;
+            preferenceLoaded_ = true;
+        }
+        value = preferred_;
+        return preferenceOk_;
     }
 
     bool BuildToolchain::matches(const ToolchainProfile &profile, const ToolchainRequirements &requirements)
@@ -155,7 +189,9 @@ namespace rhodium
 
         NullDiagnosticSink diagnostics;
         DiagnosticSink &sink = providedDiagnostics ? *providedDiagnostics : diagnostics;
-        const auto profiles = availableProfiles(context.workspaceRoot, sink);
+        ToolchainSnapshot localSnapshot(context.workspaceRoot);
+        auto &snapshot = context.toolchains ? *context.toolchains : localSnapshot;
+        const auto &profiles = snapshot.profiles(sink);
         if (profiles.empty())
         {
             return false;
@@ -164,12 +200,10 @@ namespace rhodium
         std::string requested = preferredToolchain;
         if (requested.empty() && !context.workspaceRoot.empty())
         {
-            LocalToolchainConfig config;
-            if (!readLocalToolchainConfig(context.workspaceRoot, config, sink))
+            if (!snapshot.preferredToolchain(requested, sink))
             {
                 return false;
             }
-            requested = config.preferredToolchain;
         }
 
         const ToolchainProfile *selected = nullptr;

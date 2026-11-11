@@ -41,7 +41,8 @@ namespace rhodium
         static std::string redact(const std::string &url);
         static void proxy(git_fetch_options &options, std::string &proxyUrl, DiagnosticSink &diagnostics);
         static std::string url(const std::string &source);
-        static bool open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, DiagnosticSink &diagnostics);
+        static bool open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, bool &cloned, DiagnosticSink &diagnostics);
+        static bool rememberHead(git_repository *repo, const git_oid *oid, DiagnosticSink &diagnostics);
         static bool fetch(git_repository *repo, const std::string &packageName, DiagnosticSink &diagnostics);
         static bool resolve(git_repository *repo, const std::string &ref, git_object **object);
         static bool checkout(git_repository *repo, git_object *object, std::string &commit, DiagnosticSink &diagnostics);
@@ -217,8 +218,9 @@ namespace rhodium
         return source;
     }
 
-    bool GitFetch::open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, DiagnosticSink &diagnostics)
+    bool GitFetch::open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, bool &cloned, DiagnosticSink &diagnostics)
     {
+        cloned = false;
         const auto gitDir = destination / ".git";
         if (File::dir(gitDir))
         {
@@ -281,6 +283,7 @@ namespace rhodium
 
             if (result == 0)
             {
+                cloned = true;
                 diagnostics.info("cloned package " + dependency.name + " from " + url);
                 return true;
             }
@@ -295,9 +298,10 @@ namespace rhodium
                         std::filesystem::remove_all(destination);
                     }
                 }
-                catch (...)
+                catch (const std::exception &ex)
                 {
-                    // Ignore cleanup errors
+                    diagnostics.error("failed to clean incomplete clone: " + std::string(ex.what()));
+                    return false;
                 }
                 diagnostics.warning("failed to clone from " + url + ", trying next mirror");
             }
@@ -306,6 +310,20 @@ namespace rhodium
         // All attempts failed
         diagnostics.error(error("failed to clone " + dependency.source + " (tried " + std::to_string(urlsToTry.size()) + " URL(s))"));
         return false;
+    }
+
+    bool GitFetch::rememberHead(git_repository *repo, const git_oid *oid, DiagnosticSink &diagnostics)
+    {
+        git_reference *head = nullptr;
+        const int result = oid ? git_reference_create(&head, repo, "refs/remotes/origin/HEAD", oid, 1, "refresh remote HEAD")
+                               : git_reference_remove(repo, "refs/remotes/origin/HEAD");
+        git_reference_free(head);
+        if (result != 0 && (oid || result != GIT_ENOTFOUND))
+        {
+            diagnostics.error(error("failed to refresh cached remote HEAD"));
+            return false;
+        }
+        return true;
     }
 
     bool GitFetch::fetch(git_repository *repo, const std::string &packageName, DiagnosticSink &diagnostics)
@@ -336,6 +354,40 @@ namespace rhodium
             clear();
         }
 
+        if (result == 0)
+        {
+            const git_remote_head **heads = nullptr;
+            size_t count = 0;
+            if (git_remote_ls(&heads, &count, remote) != 0)
+            {
+                diagnostics.error(error("failed to read fetched remote references"));
+                git_remote_free(remote);
+                return false;
+            }
+            bool hasRemoteHead = false;
+            for (size_t index = 0; index < count; ++index)
+            {
+                if (!heads[index]->name || std::string(heads[index]->name) != "HEAD")
+                {
+                    continue;
+                }
+                if (!rememberHead(repo, &heads[index]->oid, diagnostics))
+                {
+                    git_remote_free(remote);
+                    return false;
+                }
+                hasRemoteHead = true;
+                break;
+            }
+            if (!hasRemoteHead)
+            {
+                if (!rememberHead(repo, nullptr, diagnostics))
+                {
+                    git_remote_free(remote);
+                    return false;
+                }
+            }
+        }
         git_remote_free(remote);
         if (result != 0)
         {
@@ -348,25 +400,37 @@ namespace rhodium
     bool GitFetch::resolve(git_repository *repo, const std::string &ref, git_object **object)
     {
         const std::string requested = ref.empty() ? "HEAD" : ref;
-        if (git_revparse_single(object, repo, requested.c_str()) == 0)
+        git_oid oid;
+        if (requested.size() == GIT_OID_HEXSZ && git_oid_fromstr(&oid, requested.c_str()) == 0)
         {
-            return true;
+            return git_object_lookup(object, repo, &oid, GIT_OBJECT_ANY) == 0;
+        }
+        if (requested == "HEAD")
+        {
+            return git_revparse_single(object, repo, "refs/remotes/origin/HEAD") == 0;
+        }
+        const bool explicitBranch = requested.rfind("refs/heads/", 0) == 0;
+        if (requested.rfind("refs/", 0) == 0 && !explicitBranch)
+        {
+            return git_revparse_single(object, repo, requested.c_str()) == 0;
+        }
+        if (!explicitBranch)
+        {
+            const std::string tagRef = "refs/tags/" + requested;
+            if (git_revparse_single(object, repo, tagRef.c_str()) == 0)
+            {
+                return true;
+            }
         }
 
-        const std::string tagRef = "refs/tags/" + requested;
-        if (git_revparse_single(object, repo, tagRef.c_str()) == 0)
-        {
-            return true;
-        }
-
-        const std::string remoteRef = "refs/remotes/origin/" + requested;
+        const std::string branch = explicitBranch ? requested.substr(11) : requested;
+        const std::string remoteRef = "refs/remotes/origin/" + branch;
         if (git_revparse_single(object, repo, remoteRef.c_str()) == 0)
         {
             return true;
         }
 
-        const std::string headRef = "refs/heads/" + requested;
-        return git_revparse_single(object, repo, headRef.c_str()) == 0;
+        return git_revparse_single(object, repo, requested.c_str()) == 0;
     }
 
     bool GitFetch::checkout(git_repository *repo, git_object *object, std::string &commit, DiagnosticSink &diagnostics)
@@ -413,10 +477,13 @@ namespace rhodium
         std::string proxyUrl = proxyEnv();
         Payload payload = {&diagnostics, &proxyUrl, 0};
 
-        git_submodule_foreach(repo, [](git_submodule *sm, const char *name, void *payload) -> int {
+        const int result = git_submodule_foreach(repo, [](git_submodule *sm, const char *name, void *payload) -> int {
             auto *ctx = static_cast<Payload *>(payload);
-            ctx->count++;
-            git_submodule_init(sm, 0);
+            if (git_submodule_init(sm, 0) != 0)
+            {
+                ctx->diagnostics->error(GitFetch::error(std::string("failed to initialize submodule ") + name));
+                return GIT_EUSER;
+            }
             git_submodule_update_options opts = GIT_SUBMODULE_UPDATE_OPTIONS_INIT;
             if (!ctx->proxyUrl->empty())
             {
@@ -425,17 +492,58 @@ namespace rhodium
             }
             if (git_submodule_update(sm, 1, &opts) != 0)
             {
-                const git_error *e = git_error_last();
-                ctx->diagnostics->warning(std::string("failed to update submodule ") + name + ": " + (e && e->message ? e->message : "unknown error"));
+                ctx->diagnostics->error(GitFetch::error(std::string("failed to update submodule ") + name));
+                return GIT_EUSER;
             }
+            ++ctx->count;
             return 0;
         }, &payload);
+
+        if (result != 0)
+        {
+            diagnostics.error("failed to restore submodules for " + packageName);
+            return false;
+        }
 
         if (payload.count > 0)
         {
             diagnostics.info("initialized " + std::to_string(payload.count) + " git submodule(s) for " + packageName);
         }
         return true;
+    }
+
+    bool GitFetcher::cachedOrigin(const std::filesystem::path &repository, std::string &url)
+    {
+        if (git_libgit2_init() < 0)
+        {
+            return false;
+        }
+        git_repository *repo = nullptr;
+        git_remote *remote = nullptr;
+        const bool found = git_repository_open(&repo, repository.string().c_str()) == 0 &&
+                           git_remote_lookup(&remote, repo, "origin") == 0 && git_remote_url(remote);
+        if (found)
+        {
+            url = git_remote_url(remote);
+        }
+        git_remote_free(remote);
+        git_repository_free(repo);
+        git_libgit2_shutdown();
+        return found;
+    }
+
+    std::filesystem::path GitFetcher::localPath(const std::string &source, const std::filesystem::path &workspaceRoot)
+    {
+        const auto url = GitFetch::url(source);
+        const auto colon = url.find(':');
+        const auto separator = url.find_first_of("/\\");
+        if (url.find("://") != std::string::npos ||
+            (colon != std::string::npos && colon > 1 && (separator == std::string::npos || colon < separator)))
+        {
+            return {};
+        }
+        const std::filesystem::path path(url);
+        return std::filesystem::weakly_canonical(path.is_absolute() ? path : workspaceRoot / path);
     }
 
     bool GitFetcher::initialize(DiagnosticSink &diagnostics) const
@@ -456,19 +564,58 @@ namespace rhodium
         return fetch(dependency, destination, commit, diagnostics);
     }
 
-    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, std::string &commit, DiagnosticSink &diagnostics) const
+    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, std::string &commit, DiagnosticSink &diagnostics, bool refresh) const
     {
-        git_libgit2_init();
-        git_repository *repo = nullptr;
-        if (!GitFetch::open(dependency, destination, &repo, diagnostics))
+        if (git_libgit2_init() < 0)
         {
+            diagnostics.error("libgit2 initialization failed");
+            return false;
+        }
+        git_repository *repo = nullptr;
+        bool cloned = false;
+        if (!GitFetch::open(dependency, destination, &repo, cloned, diagnostics))
+        {
+            git_repository_free(repo);
             git_libgit2_shutdown();
             return false;
         }
 
-        bool ok = GitFetch::fetch(repo, dependency.name, diagnostics);
+        bool ok = true;
+        if (cloned)
+        {
+            git_reference *head = nullptr;
+            ok = git_repository_head(&head, repo) == 0;
+            if (ok)
+            {
+                ok = GitFetch::rememberHead(repo, git_reference_target(head), diagnostics);
+            }
+            else
+            {
+                if (dependency.ref.empty() || dependency.ref == "HEAD")
+                {
+                    diagnostics.error(GitFetch::error("cloned repository has no default commit"));
+                }
+                else
+                {
+                    ok = GitFetch::rememberHead(repo, nullptr, diagnostics);
+                }
+            }
+            git_reference_free(head);
+        }
         git_object *object = nullptr;
-        if (ok && !GitFetch::resolve(repo, dependency.ref, &object))
+        git_oid oid;
+        const bool immutable = dependency.ref.size() == GIT_OID_HEXSZ && git_oid_fromstr(&oid, dependency.ref.c_str()) == 0;
+        if (ok && immutable)
+        {
+            GitFetch::resolve(repo, dependency.ref, &object);
+        }
+        if (ok && !cloned && (refresh || !immutable || !object))
+        {
+            git_object_free(object);
+            object = nullptr;
+            ok = GitFetch::fetch(repo, dependency.name, diagnostics);
+        }
+        if (ok && !object && !GitFetch::resolve(repo, dependency.ref, &object))
         {
             diagnostics.error(GitFetch::error("failed to resolve dependency ref " + dependency.ref));
             ok = false;
@@ -479,7 +626,7 @@ namespace rhodium
         }
         if (ok)
         {
-            GitFetch::submodules(repo, dependency.name, diagnostics);
+            ok = GitFetch::submodules(repo, dependency.name, diagnostics);
         }
 
         if (object)

@@ -1,3 +1,5 @@
+#include "rhodium/core/WorkspaceLock.hpp"
+
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
@@ -61,6 +63,11 @@ namespace rhodium
                            const std::vector<std::string> &cliOverrides)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         BuildModel model;
         if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
         {
@@ -169,6 +176,11 @@ namespace rhodium
                              const std::string &configOption)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LockFile lockFile;
         if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
         {

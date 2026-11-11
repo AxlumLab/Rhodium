@@ -4,6 +4,7 @@
 #include "rhodium/resolve/DependencyFetchStep.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace rhodium
 {
@@ -105,6 +106,47 @@ namespace rhodium
             return relative.generic_string();
         }
         return path.generic_string();
+    }
+
+    void DepLock::store(LockFile &lockFile, LockedPackage package, const LockedPackage *previous)
+    {
+        const auto name = package.name;
+        const auto config = BuildConfig::normalize(package.config);
+        const auto toolchain = package.toolchainId;
+        const auto previousToolchain = previous ? previous->toolchainId : toolchain;
+        const bool hasPrevious = previous != nullptr;
+        const bool overridden = package.overridden;
+        auto sameSlot = [&](const LockedPackage &entry)
+        {
+            return entry.name == name && BuildConfig::normalize(entry.config) == config &&
+                   entry.overridden == overridden &&
+                   (entry.toolchainId == toolchain || (hasPrevious && entry.toolchainId == previousToolchain));
+        };
+        auto current = std::find_if(lockFile.packages.begin(), lockFile.packages.end(), sameSlot);
+        std::size_t keep;
+        if (current == lockFile.packages.end())
+        {
+            keep = lockFile.packages.size();
+            lockFile.packages.push_back(std::move(package));
+        }
+        else
+        {
+            keep = static_cast<std::size_t>(current - lockFile.packages.begin());
+            *current = std::move(package);
+        }
+        std::size_t written = 0;
+        for (std::size_t index = 0; index < lockFile.packages.size(); ++index)
+        {
+            if (index == keep || !sameSlot(lockFile.packages[index]))
+            {
+                if (written != index)
+                {
+                    lockFile.packages[written] = std::move(lockFile.packages[index]);
+                }
+                ++written;
+            }
+        }
+        lockFile.packages.resize(written);
     }
 
 } // namespace rhodium
