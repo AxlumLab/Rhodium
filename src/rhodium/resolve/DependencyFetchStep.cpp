@@ -49,7 +49,8 @@ namespace rhodium
             result.commit = archiveResult.archiveHash;
             result.sourceRoot = archiveResult.sourceDir;
 
-            if (locked)
+            if (locked && !wantsUpdate && !context.options.rebuild &&
+                !context.options.buildOnly && !context.options.exportOnly)
             {
                 LockedPackage expected = LockedPackage::from(dependency,
                                                               result.commit,
@@ -88,7 +89,8 @@ namespace rhodium
                 return true;
             }
 
-            if (locked && !result.commit.empty() && !wantsUpdate)
+            if (locked && !result.commit.empty() && !wantsUpdate &&
+                !context.options.rebuild && !context.options.buildOnly)
             {
                 LockedPackage expected = LockedPackage::from(dependency,
                                                               result.commit,

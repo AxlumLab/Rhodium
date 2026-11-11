@@ -336,6 +336,47 @@ namespace rhodium
             clear();
         }
 
+        if (result == 0)
+        {
+            const git_remote_head **heads = nullptr;
+            size_t count = 0;
+            if (git_remote_ls(&heads, &count, remote) != 0)
+            {
+                diagnostics.error(error("failed to read fetched remote references"));
+                git_remote_free(remote);
+                return false;
+            }
+            bool hasRemoteHead = false;
+            for (size_t index = 0; index < count; ++index)
+            {
+                if (!heads[index]->name || std::string(heads[index]->name) != "HEAD")
+                {
+                    continue;
+                }
+                git_reference *head = nullptr;
+                const int updated = git_reference_create(&head, repo, "refs/remotes/origin/HEAD",
+                                                         &heads[index]->oid, 1, "refresh remote HEAD");
+                git_reference_free(head);
+                if (updated != 0)
+                {
+                    diagnostics.error(error("failed to refresh cached remote HEAD"));
+                    git_remote_free(remote);
+                    return false;
+                }
+                hasRemoteHead = true;
+                break;
+            }
+            if (!hasRemoteHead)
+            {
+                const int removed = git_reference_remove(repo, "refs/remotes/origin/HEAD");
+                if (removed != 0 && removed != GIT_ENOTFOUND)
+                {
+                    diagnostics.error(error("failed to clear stale remote HEAD"));
+                    git_remote_free(remote);
+                    return false;
+                }
+            }
+        }
         git_remote_free(remote);
         if (result != 0)
         {
@@ -348,25 +389,37 @@ namespace rhodium
     bool GitFetch::resolve(git_repository *repo, const std::string &ref, git_object **object)
     {
         const std::string requested = ref.empty() ? "HEAD" : ref;
-        if (git_revparse_single(object, repo, requested.c_str()) == 0)
+        git_oid oid;
+        if (requested.size() == GIT_OID_HEXSZ && git_oid_fromstr(&oid, requested.c_str()) == 0)
         {
-            return true;
+            return git_object_lookup(object, repo, &oid, GIT_OBJECT_ANY) == 0;
+        }
+        if (requested == "HEAD")
+        {
+            return git_revparse_single(object, repo, "refs/remotes/origin/HEAD") == 0;
+        }
+        const bool explicitBranch = requested.rfind("refs/heads/", 0) == 0;
+        if (requested.rfind("refs/", 0) == 0 && !explicitBranch)
+        {
+            return git_revparse_single(object, repo, requested.c_str()) == 0;
+        }
+        if (!explicitBranch)
+        {
+            const std::string tagRef = "refs/tags/" + requested;
+            if (git_revparse_single(object, repo, tagRef.c_str()) == 0)
+            {
+                return true;
+            }
         }
 
-        const std::string tagRef = "refs/tags/" + requested;
-        if (git_revparse_single(object, repo, tagRef.c_str()) == 0)
-        {
-            return true;
-        }
-
-        const std::string remoteRef = "refs/remotes/origin/" + requested;
+        const std::string branch = explicitBranch ? requested.substr(11) : requested;
+        const std::string remoteRef = "refs/remotes/origin/" + branch;
         if (git_revparse_single(object, repo, remoteRef.c_str()) == 0)
         {
             return true;
         }
 
-        const std::string headRef = "refs/heads/" + requested;
-        return git_revparse_single(object, repo, headRef.c_str()) == 0;
+        return git_revparse_single(object, repo, requested.c_str()) == 0;
     }
 
     bool GitFetch::checkout(git_repository *repo, git_object *object, std::string &commit, DiagnosticSink &diagnostics)

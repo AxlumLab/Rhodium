@@ -4,8 +4,10 @@ set(RHODIUM_TEST_SOURCES
     tests/rhodium/BuildModelTests.cpp
     tests/rhodium/WorkspaceCompatibilityTests.cpp
     tests/rhodium/ArchiveTests.cpp
+    tests/rhodium/ArtifactGcTests.cpp
     tests/rhodium/CMakeDependencyExporterTests.cpp
     tests/rhodium/DependencyResolverTests.cpp
+    tests/rhodium/DependencyBuildStepTests.cpp
     tests/rhodium/LuaDslTests.cpp
     tests/rhodium/LockFileTests.cpp
     tests/rhodium/PackageArtifactResolverTests.cpp

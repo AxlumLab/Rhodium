@@ -485,4 +485,175 @@ int value() {
         std::filesystem::remove_all(dir);
     }
 
+    TEST(DependencyResolverTests, LockedRestoreRejectsChangedInputsWithoutPublishingArtifacts)
+    {
+        const auto dir = makeTempDir();
+        auto model = localHeaderOnlyModel();
+        std::filesystem::create_directories(dir / "third_party/HeaderOnly/include");
+        rhodium::DependencyResolver resolver;
+        rhodium::JsonDiagnosticSink diagnostics;
+        rhodium::DependencyRestoreOptions options;
+        options.toolchainContentHash = "toolchain-a";
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "fixture", "debug", {}, options));
+        const auto before = rhodium::File::read(dir / "tpkg.lock.toml");
+        const auto artifactCount = directoryCount(dir / ".rhodium/artifacts/HeaderOnly");
+
+        options.locked = true;
+        model.rootPackage.dependencies[0].buildOptions["FEATURE"] = "ON";
+        rhodium::JsonDiagnosticSink changedInputs;
+        EXPECT_FALSE(resolver.restore(model, dir, changedInputs, "fixture", "debug", {}, options));
+        EXPECT_NE(changedInputs.diagnostics().dump().find("inputs differ from the lock entry"), std::string::npos);
+        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
+        EXPECT_EQ(directoryCount(dir / ".rhodium/artifacts/HeaderOnly"), artifactCount);
+
+        model.rootPackage.dependencies[0].buildOptions.clear();
+        options.toolchainContentHash = "toolchain-b";
+        rhodium::JsonDiagnosticSink changedToolchain;
+        EXPECT_FALSE(resolver.restore(model, dir, changedToolchain, "fixture", "debug", {}, options));
+        EXPECT_NE(changedToolchain.diagnostics().dump().find("inputs differ from the lock entry"), std::string::npos);
+        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
+        EXPECT_EQ(directoryCount(dir / ".rhodium/artifacts/HeaderOnly"), artifactCount);
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(DependencyResolverTests, CachedArchiveHonorsExplicitStageOptions)
+    {
+        const auto dir = makeTempDir();
+        createHelloZip(dir / "hello.zip");
+        rhodium::BuildModel model;
+        rhodium::DependencyDesc dependency;
+        dependency.name = "hello";
+        dependency.source = "hello.zip";
+        dependency.sourceType = "archive";
+        dependency.sha256 = rhodium::sha256File(dir / "hello.zip");
+        dependency.stripComponents = 1;
+        dependency.buildType = "header_only";
+        dependency.artifacts.includeDirs = {"include"};
+        model.rootPackage.dependencies.push_back(dependency);
+        rhodium::DependencyResolver resolver;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics));
+        rhodium::PackageCache cache(dir / ".rhodium/packages");
+        const auto sentinel = cache.build(dependency, "debug-default") / "stale.txt";
+        for (int mode = 0; mode < 3; ++mode)
+        {
+            writeText(sentinel, "old cache");
+            rhodium::DependencyRestoreOptions options;
+            options.rebuild = mode == 0;
+            options.buildOnly = mode == 1;
+            options.exportOnly = mode == 2;
+            rhodium::JsonDiagnosticSink explicitStage;
+            ASSERT_TRUE(resolver.restore(model, dir, explicitStage, {}, "debug", {}, options))
+                << explicitStage.diagnostics().dump();
+            EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping archive build"), std::string::npos);
+            EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping build"), std::string::npos);
+            if (options.rebuild)
+            {
+                EXPECT_FALSE(std::filesystem::exists(sentinel));
+            }
+        }
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(DependencyResolverTests, GitBranchUpdatesUseRemoteTipAndKeepNestedSourceCache)
+    {
+        const auto dir = makeTempDir();
+        const auto repo = dir / "BranchSource";
+        writeText(repo / "include/value.hpp", "first\n");
+        std::string output;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "init"}, output)) << output;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "feature/topic"}, output)) << output;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "test@example.invalid"}, output));
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Fixture"}, output));
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "add", "."}, output));
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "first"}, output)) << output;
+
+        rhodium::BuildModel model;
+        rhodium::DependencyDesc dependency;
+        dependency.name = "BranchPackage";
+        dependency.source = "BranchSource";
+        dependency.sourceType = "git";
+        dependency.ref = "feature/topic";
+        dependency.buildType = "header_only";
+        dependency.artifacts.includeDirs = {"include"};
+        model.rootPackage.dependencies.push_back(dependency);
+        rhodium::DependencyResolver resolver;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
+        rhodium::LockFile first;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", first, diagnostics));
+        ASSERT_EQ(first.packages.size(), 1u);
+        rhodium::PackageCache cache(dir / ".rhodium/packages");
+        ASSERT_TRUE(std::filesystem::is_directory(cache.source(dependency) / ".git"));
+
+        const auto defaultWorkspace = dir / "default-consumer";
+        auto defaultModel = model;
+        defaultModel.rootPackage.dependencies[0].source = "../BranchSource";
+        defaultModel.rootPackage.dependencies[0].ref.clear();
+        ASSERT_TRUE(resolver.restore(defaultModel, defaultWorkspace, diagnostics)) << diagnostics.diagnostics().dump();
+
+        for (int mode = 0; mode < 3; ++mode)
+        {
+            const auto sentinel = cache.build(dependency, "debug-default") / "stale.txt";
+            writeText(sentinel, "old cache");
+            rhodium::DependencyRestoreOptions options;
+            options.rebuild = mode == 0;
+            options.buildOnly = mode == 1;
+            options.exportOnly = mode == 2;
+            rhodium::JsonDiagnosticSink explicitStage;
+            ASSERT_TRUE(resolver.restore(model, dir, explicitStage, {}, "debug", {}, options)) << explicitStage.diagnostics().dump();
+            EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping git sync and build"), std::string::npos);
+            if (options.rebuild)
+            {
+                EXPECT_FALSE(std::filesystem::exists(sentinel));
+            }
+        }
+
+        writeText(repo / "include/value.hpp", "second\n");
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "add", "."}, output));
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "second"}, output)) << output;
+        rhodium::DependencyRestoreOptions update;
+        update.updatePackage = dependency.name;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "debug", {}, update)) << diagnostics.diagnostics().dump();
+        rhodium::LockFile updated;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", updated, diagnostics));
+        ASSERT_EQ(updated.packages.size(), 1u);
+        EXPECT_NE(updated.packages[0].commit, first.packages[0].commit);
+        EXPECT_EQ(rhodium::File::read(dir / ".rhodium/artifacts" / updated.packages[0].artifactId / "include/value.hpp"), "second\n");
+        EXPECT_TRUE(std::filesystem::is_directory(cache.source(dependency) / ".git"));
+
+        ASSERT_TRUE(resolver.restore(defaultModel, defaultWorkspace, diagnostics, {}, "debug", {}, update))
+            << diagnostics.diagnostics().dump();
+        rhodium::LockFile updatedDefault;
+        ASSERT_TRUE(rhodium::LockFile::read(defaultWorkspace / "tpkg.lock.toml", updatedDefault, diagnostics));
+        ASSERT_EQ(updatedDefault.packages.size(), 1u);
+        EXPECT_EQ(updatedDefault.packages[0].commit, updated.packages[0].commit);
+
+        model.rootPackage.dependencies[0].ref = first.packages[0].commit;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
+        rhodium::LockFile pinned;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", pinned, diagnostics));
+        EXPECT_EQ(pinned.packages.back().commit, first.packages[0].commit);
+        EXPECT_EQ(rhodium::File::read(dir / ".rhodium/artifacts" / pinned.packages.back().artifactId / "include/value.hpp"), "first\n");
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(DependencyResolverTests, RejectsConflictingRestoreModesBeforeCreatingState)
+    {
+        const auto dir = makeTempDir();
+        rhodium::BuildModel model;
+        rhodium::DependencyResolver resolver;
+        rhodium::JsonDiagnosticSink diagnostics;
+        rhodium::DependencyRestoreOptions options;
+        options.locked = true;
+        options.updateAll = true;
+        EXPECT_FALSE(resolver.restore(model, dir, diagnostics, {}, "debug", {}, options));
+        options = {};
+        options.exportOnly = true;
+        options.rebuild = true;
+        EXPECT_FALSE(resolver.restore(model, dir, diagnostics, {}, "debug", {}, options));
+        EXPECT_FALSE(std::filesystem::exists(dir / ".rhodium"));
+        std::filesystem::remove_all(dir);
+    }
+
 } // namespace

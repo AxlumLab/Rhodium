@@ -40,14 +40,26 @@ namespace rhodium
                                               context.options.toolchainContentHash);
         result.updated.source = DepLock::source(context.workspaceRoot, dependency);
 
+        if (context.options.locked &&
+            (!locked || locked->buildHash.empty() ||
+             locked->buildHash != result.updated.buildHash ||
+             locked->artifactId != result.updated.artifactId ||
+             locked->commit != result.updated.commit ||
+             locked->source != result.updated.source))
+        {
+            diagnostics.error("restore --locked inputs differ from the lock entry for package " + dependency.name);
+            return false;
+        }
+
         const auto buildKey = key(context.effectiveConfig, context.preferredToolchain);
         const auto buildDir = context.cache.build(dependency, buildKey);
         result.artifactDir = Path::stateRoot(context.workspaceRoot) / "artifacts" / result.updated.artifactId;
-        const bool artifactReusable = !dependency.local &&
+        const bool localSource = dependency.local || dependency.sourceType == "local";
+        const bool artifactReusable = !localSource &&
                                       locked &&
                                       !wantsUpdate &&
                                       DepExport::reusable(*locked, result.updated, result.artifactDir);
-        if (artifactReusable && !context.options.buildOnly && !context.options.rebuild)
+        if (artifactReusable && !context.options.buildOnly && !context.options.exportOnly && !context.options.rebuild)
         {
             diagnostics.info("package artifact is up to date; skipping build: " + dependency.name);
             if (!DepExport::gc(context.lockFile,
@@ -62,7 +74,16 @@ namespace rhodium
             result.skipPackage = true;
             return true;
         }
-        if (context.options.rebuild && !removeBeforeRebuild(buildDir, diagnostics))
+        const bool hasBuildStage = hasStage(dependency);
+        const bool matchingBuild = completed(buildDir, result.updated.buildHash);
+        if (context.options.exportOnly && hasBuildStage && !matchingBuild)
+        {
+            diagnostics.error("restore --export-only requires a completed build directory matching the current inputs for package " + dependency.name + ": " + buildDir.string());
+            return false;
+        }
+        if ((context.options.rebuild ||
+             (!context.options.exportOnly && hasBuildStage && File::dir(buildDir) && !matchingBuild)) &&
+            !removeBeforeRebuild(buildDir, diagnostics))
         {
             return false;
         }
@@ -71,10 +92,14 @@ namespace rhodium
                        buildKey,
                        retained(context.lockFile, dependency.name, buildKey),
                        diagnostics);
-        const bool hasBuildStage = hasStage(dependency);
         bool buildDirExists = File::dir(buildDir);
         if (buildDirExists && hasCMakeCache(buildDir) && !cacheMatchesDir(buildDir))
         {
+            if (context.options.exportOnly)
+            {
+                diagnostics.error("restore --export-only cannot use a moved CMake build directory: " + buildDir.string());
+                return false;
+            }
             diagnostics.warning("cmake build cache was moved from another path; removing it before rebuild: " + buildDir.string());
             if (!removeBeforeRebuild(buildDir, diagnostics))
             {
@@ -83,14 +108,20 @@ namespace rhodium
             buildDirExists = false;
         }
         PackageBuildOptions buildOptions;
-        const bool completedBuildStage = buildDirExists && completed(buildDir);
-        buildOptions.runBuild = hasBuildStage && !context.options.exportOnly && (context.options.buildOnly || context.options.rebuild || !completedBuildStage);
+        const bool completedBuildStage = buildDirExists && completed(buildDir, result.updated.buildHash);
+        buildOptions.runBuild = hasBuildStage && !context.options.exportOnly &&
+                               (localSource || context.options.buildOnly || context.options.rebuild || !completedBuildStage);
         buildOptions.runExport = !context.options.buildOnly;
 
-        if (context.options.exportOnly && hasBuildStage && !completedBuildStage)
+        if (buildOptions.runBuild)
         {
-            diagnostics.error("restore --export-only requires a completed build directory for package " + dependency.name + ": " + buildDir.string());
-            return false;
+            std::error_code ec;
+            std::filesystem::remove(buildDir / ".tpkg_build_complete", ec);
+            if (ec)
+            {
+                diagnostics.error("failed to invalidate package build marker: " + ec.message());
+                return false;
+            }
         }
 
         auto packageBuilder = builder(dependency);
@@ -120,6 +151,15 @@ namespace rhodium
             return false;
         }
 
+        if (buildOptions.runBuild)
+        {
+            std::string error;
+            if (!File::write(buildDir / ".tpkg_build_complete", result.updated.buildHash + "\n", &error))
+            {
+                diagnostics.error("failed to record package build fingerprint: " + error);
+                return false;
+            }
+        }
         return true;
     }
 
@@ -306,9 +346,9 @@ namespace rhodium
                dependency.buildType == "custom";
     }
 
-    bool DepBuild::completed(const std::filesystem::path &buildDir)
+    bool DepBuild::completed(const std::filesystem::path &buildDir, const std::string &buildHash)
     {
-        return File::exists(buildDir / ".tpkg_build_complete");
+        return !buildHash.empty() && File::read(buildDir / ".tpkg_build_complete") == buildHash + "\n";
     }
 
 } // namespace rhodium

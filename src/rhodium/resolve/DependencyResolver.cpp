@@ -30,6 +30,16 @@ namespace rhodium
                                      const DependencyOverrideSet &overrides,
                                      const DependencyRestoreOptions &options) const
     {
+        if (options.exportOnly && options.rebuild)
+        {
+            diagnostics.error("restore --export-only cannot be combined with --rebuild");
+            return false;
+        }
+        if (options.locked && (options.updateAll || !options.updatePackage.empty()))
+        {
+            diagnostics.error("restore --locked cannot update dependency versions");
+            return false;
+        }
         const auto effectiveConfig = BuildConfig::normalize(config, model.workspace.defaultConfig);
         if (!BuildConfig::validate(effectiveConfig, diagnostics))
         {

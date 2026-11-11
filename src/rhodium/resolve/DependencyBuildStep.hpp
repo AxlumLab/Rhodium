@@ -67,7 +67,7 @@ namespace rhodium
         static bool hasCMakeCache(const std::filesystem::path &buildDir);
         static bool cacheMatchesDir(const std::filesystem::path &buildDir);
         static bool hasStage(const DependencyDesc &dependency);
-        static bool completed(const std::filesystem::path &buildDir);
+        static bool completed(const std::filesystem::path &buildDir, const std::string &buildHash);
     };
 
 } // namespace rhodium

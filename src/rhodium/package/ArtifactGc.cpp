@@ -234,6 +234,70 @@ namespace rhodium
             return true;
         };
 
+        auto pruneGitSource = [&](auto &&self, const std::filesystem::path &path, const std::string &packageName) -> bool
+        {
+            std::error_code inspectError;
+            if (std::filesystem::is_symlink(path, inspectError))
+            {
+                diagnostics.warning("skipping symlink in git source cache: " + path.string());
+                return true;
+            }
+            if (inspectError)
+            {
+                diagnostics.error("failed to inspect git ref directory: " + inspectError.message());
+                return false;
+            }
+            const auto normalized = path.lexically_normal();
+            if (keepGitSources.find(normalized) != keepGitSources.end())
+            {
+                return true;
+            }
+            bool containsKeptSource = false;
+            for (const auto &kept : keepGitSources)
+            {
+                const auto relative = kept.lexically_relative(normalized);
+                if (!relative.empty() && !relative.is_absolute() && *relative.begin() != "..")
+                {
+                    containsKeptSource = true;
+                    break;
+                }
+            }
+            if (!containsKeptSource)
+            {
+                return removeCacheDir(path, "package=" + packageName + " reason=not current git ref");
+            }
+
+            // Refs containing '/' share parent directories; prune only their unused children.
+            std::error_code ec;
+            std::filesystem::directory_iterator entries(path, ec);
+            if (ec)
+            {
+                diagnostics.error("failed to scan git ref directory: " + ec.message());
+                return false;
+            }
+            const std::filesystem::directory_iterator end;
+            while (entries != end)
+            {
+                const auto entry = *entries;
+                entries.increment(ec);
+                if (ec)
+                {
+                    diagnostics.error("failed to scan git ref directory: " + ec.message());
+                    return false;
+                }
+                if (entry.is_directory(ec) && !entry.is_symlink(ec) && !self(self, entry.path(), packageName))
+                {
+                    return false;
+                }
+                if (ec)
+                {
+                    diagnostics.error("failed to inspect git ref directory: " + ec.message());
+                    return false;
+                }
+            }
+            return true;
+        };
+
         for (const auto &package : lockFile.packages)
         {
             if (package.sourceType != "git" || (!packageFilter.empty() && package.name != packageFilter))
@@ -261,12 +325,7 @@ namespace rhodium
                 {
                     continue;
                 }
-                const auto path = entry.path().lexically_normal();
-                if (keepGitSources.find(path) != keepGitSources.end())
-                {
-                    continue;
-                }
-                if (!removeCacheDir(entry.path(), "package=" + package.name + " reason=not current git ref"))
+                if (!pruneGitSource(pruneGitSource, entry.path(), package.name))
                 {
                     return false;
                 }
