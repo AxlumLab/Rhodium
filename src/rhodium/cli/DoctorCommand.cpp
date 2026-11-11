@@ -4,6 +4,8 @@
  * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
  */
 
+#include "rhodium/core/WorkspaceLock.hpp"
+
 #include "rhodium/core/Path.hpp"
 
 #include "rhodium/cli/Commands.hpp"
@@ -79,6 +81,11 @@ namespace rhodium
     int Commands::doctor(const std::filesystem::path &workspaceRoot, bool sdkDetails)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         bool ok = true;
 
         LogInfo("Rhodium doctor");

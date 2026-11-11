@@ -220,3 +220,81 @@ TEST(ArtifactGcTests, DoesNotTraverseSymlinkedRefParents)
     EXPECT_TRUE(std::filesystem::is_directory(root / "outside/stale"));
     std::filesystem::remove_all(root);
 }
+
+TEST(ArtifactGcTests, ReclaimsOldUrlsAndRemovedGitPackagesFromTheDiskInventory)
+{
+    const auto root = makeGcTempDir();
+    auto package = lockedPackage("fmt");
+    package.ref = "feature/current";
+    rhodium::LockFile lockFile;
+    lockFile.packages.push_back(package);
+    rhodium::DependencyDesc dependency;
+    dependency.name = package.name;
+    dependency.source = package.source;
+    dependency.ref = package.ref;
+    rhodium::PackageCache cache(root / ".tpkg/packages");
+    const auto live = cache.source(dependency);
+    std::filesystem::create_directories(live / ".git");
+    dependency.source = "https://example.invalid/old-url.git";
+    const auto oldUrl = cache.sourceRoot(dependency);
+    std::filesystem::create_directories(cache.source(dependency) / ".git");
+    const auto orphan = cache.root() / "removed/url/ref";
+    std::filesystem::create_directories(orphan / ".git");
+
+    rhodium::JsonDiagnosticSink diagnostics;
+    ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lockFile, root, false, {}, diagnostics));
+    EXPECT_TRUE(std::filesystem::exists(oldUrl));
+    ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lockFile, root, true, "fmt", diagnostics));
+    EXPECT_TRUE(std::filesystem::is_directory(live / ".git"));
+    EXPECT_FALSE(std::filesystem::exists(oldUrl));
+    EXPECT_TRUE(std::filesystem::exists(orphan));
+    ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lockFile, root, true, {}, diagnostics));
+    EXPECT_FALSE(std::filesystem::exists(orphan));
+    EXPECT_TRUE(std::filesystem::is_directory(live / ".git"));
+    std::filesystem::remove_all(root);
+}
+
+TEST(ArtifactGcTests, PreservesCacheDirectoriesExplicitlyUsedAsLocalDependencySources)
+{
+    const auto root = makeGcTempDir();
+    const auto artifact = root / ".tpkg/artifacts/cache/live";
+    const auto build = root / ".tpkg/build-packages/cache/live";
+    const auto source = root / ".tpkg/packages/cache/url/live";
+    rhodium::LockFile lock;
+    int index = 0;
+    for (const auto &path : {artifact, build, source})
+    {
+        std::filesystem::create_directories(path);
+        std::filesystem::create_directories(path.parent_path() / "stale");
+        rhodium::LockedPackage package;
+        package.name = "LocalAlias" + std::to_string(index++);
+        package.sourceType = "local";
+        package.source = path.string();
+        package.artifactId = package.name + "/local";
+        lock.packages.push_back(package);
+    }
+    rhodium::JsonDiagnosticSink diagnostics;
+    ASSERT_TRUE(rhodium::ArtifactGc::runArtifacts(lock, root, true, {}, diagnostics));
+    ASSERT_TRUE(rhodium::ArtifactGc::runBuildCaches(lock, root, "debug", "", true, {}, diagnostics));
+    ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lock, root, true, {}, diagnostics)) << diagnostics.diagnostics().dump();
+    for (const auto &path : {artifact, build, source})
+    {
+        EXPECT_TRUE(std::filesystem::is_directory(path));
+        EXPECT_FALSE(std::filesystem::exists(path.parent_path() / "stale"));
+    }
+    std::filesystem::remove_all(root);
+}
+
+TEST(ArtifactGcTests, InvalidSourceLockEntriesDoNotAuthorizeSourceDeletion)
+{
+    const auto root = makeGcTempDir();
+    std::filesystem::create_directories(root / ".tpkg/packages/keep/url/ref");
+    auto invalid = lockedPackage("fmt");
+    invalid.source.clear();
+    rhodium::LockFile lock;
+    lock.packages.push_back(invalid);
+    rhodium::JsonDiagnosticSink diagnostics;
+    EXPECT_FALSE(rhodium::ArtifactGc::runSourceCaches(lock, root, true, {}, diagnostics));
+    EXPECT_TRUE(std::filesystem::is_directory(root / ".tpkg/packages/keep/url/ref"));
+    std::filesystem::remove_all(root);
+}

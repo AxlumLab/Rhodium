@@ -62,15 +62,6 @@ namespace rhodium
         if (artifactReusable && !context.options.buildOnly && !context.options.exportOnly && !context.options.rebuild)
         {
             diagnostics.info("package artifact is up to date; skipping build: " + dependency.name);
-            if (!DepExport::gc(context.lockFile,
-                               context.workspaceRoot,
-                               context.effectiveConfig,
-                               context.preferredToolchain,
-                               dependency.name,
-                               diagnostics))
-            {
-                return false;
-            }
             result.skipPackage = true;
             return true;
         }
@@ -87,11 +78,6 @@ namespace rhodium
         {
             return false;
         }
-        removeSiblings(context.cache,
-                       dependency,
-                       buildKey,
-                       retained(context.lockFile, dependency.name, buildKey),
-                       diagnostics);
         bool buildDirExists = File::dir(buildDir);
         if (buildDirExists && hasCMakeCache(buildDir) && !cacheMatchesDir(buildDir))
         {
@@ -108,6 +94,7 @@ namespace rhodium
             buildDirExists = false;
         }
         PackageBuildOptions buildOptions;
+        buildOptions.toolchains = context.options.toolchains;
         const bool completedBuildStage = buildDirExists && completed(buildDir, result.updated.buildHash);
         buildOptions.runBuild = hasBuildStage && !context.options.exportOnly &&
                                (localSource || context.options.buildOnly || context.options.rebuild || !completedBuildStage);
@@ -224,65 +211,6 @@ namespace rhodium
     std::string DepBuild::key(const std::string &config, const std::string &toolchainId)
     {
         return BuildConfig::normalize(config) + "-" + (toolchainId.empty() ? std::string("default") : toolchainId);
-    }
-
-    std::set<std::string> DepBuild::retained(const LockFile &lockFile,
-                                             const std::string &packageName,
-                                             const std::string &currentPkgKey)
-    {
-        std::set<std::string> keys{currentPkgKey};
-        for (const auto &package : lockFile.packages)
-        {
-            if (package.name != packageName)
-            {
-                continue;
-            }
-            keys.insert(key(package.config, package.toolchainId));
-        }
-        return keys;
-    }
-
-    void DepBuild::removeSiblings(const PackageCache &cache,
-                                  const DependencyDesc &dependency,
-                                  const std::string &currentPkgKey,
-                                  const std::set<std::string> &keepKeys,
-                                  DiagnosticSink &diagnostics)
-    {
-        const auto buildRoot = cache.build(dependency, currentPkgKey).parent_path();
-        std::error_code ec;
-        if (!std::filesystem::is_directory(buildRoot, ec))
-        {
-            return;
-        }
-
-        for (const auto &entry : std::filesystem::directory_iterator(buildRoot, ec))
-        {
-            if (ec)
-            {
-                diagnostics.warning("failed to scan package build cache: " + ec.message());
-                return;
-            }
-            if (!entry.is_directory(ec))
-            {
-                continue;
-            }
-            const auto name = entry.path().filename().string();
-            if (keepKeys.find(name) != keepKeys.end())
-            {
-                continue;
-            }
-
-            std::filesystem::remove_all(entry.path(), ec);
-            if (ec)
-            {
-                diagnostics.warning("failed to remove stale package build cache " + entry.path().string() + ": " + ec.message());
-                ec.clear();
-            }
-            else
-            {
-                diagnostics.info("removed stale package build cache: " + entry.path().string());
-            }
-        }
     }
 
     bool DepBuild::removeBeforeRebuild(const std::filesystem::path &buildDir,

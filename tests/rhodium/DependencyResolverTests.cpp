@@ -656,4 +656,64 @@ int value() {
         std::filesystem::remove_all(dir);
     }
 
+    TEST(DependencyResolverTests, FullRestorePrunesRemovedDependenciesButTargetedRestorePreservesThem)
+    {
+        const auto dir = makeTempDir();
+        auto model = localHeaderOnlyModel("A");
+        auto second = model.rootPackage.dependencies[0];
+        second.name = "B";
+        second.source = "third_party/B";
+        model.rootPackage.dependencies.push_back(second);
+        std::filesystem::create_directories(dir / "third_party/A/include");
+        std::filesystem::create_directories(dir / "third_party/B/include");
+        rhodium::JsonDiagnosticSink diagnostics;
+        rhodium::DependencyResolver resolver;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
+        rhodium::LockFile before;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", before, diagnostics));
+        ASSERT_EQ(before.packages.size(), 2u);
+        const auto oldArtifact = dir / ".rhodium/artifacts" / before.packages[1].artifactId;
+
+        model.rootPackage.dependencies.pop_back();
+        rhodium::DependencyRestoreOptions targeted;
+        targeted.packageName = "A";
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "debug", {}, targeted));
+        rhodium::LockFile partial;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", partial, diagnostics));
+        EXPECT_EQ(partial.packages.size(), 2u);
+        EXPECT_TRUE(std::filesystem::exists(oldArtifact));
+
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
+        rhodium::LockFile after;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", after, diagnostics));
+        ASSERT_EQ(after.packages.size(), 1u);
+        EXPECT_EQ(after.packages[0].name, "A");
+        EXPECT_FALSE(std::filesystem::exists(oldArtifact));
+        EXPECT_TRUE(std::filesystem::is_directory(dir / "third_party/B/include"));
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(DependencyResolverTests, PruningRemovedDependenciesPreservesOtherConfigurationVariants)
+    {
+        const auto dir = makeTempDir();
+        auto model = localHeaderOnlyModel();
+        std::filesystem::create_directories(dir / "third_party/HeaderOnly/include");
+        rhodium::JsonDiagnosticSink diagnostics;
+        rhodium::DependencyResolver resolver;
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "debug"));
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "release"));
+        model.rootPackage.dependencies.clear();
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "debug"));
+        rhodium::LockFile remaining;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", remaining, diagnostics));
+        ASSERT_EQ(remaining.packages.size(), 1u);
+        EXPECT_EQ(remaining.packages[0].config, "release");
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, {}, "release"));
+        rhodium::LockFile empty;
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", empty, diagnostics));
+        EXPECT_TRUE(empty.packages.empty());
+        EXPECT_TRUE(std::filesystem::is_directory(dir / "third_party/HeaderOnly/include"));
+        std::filesystem::remove_all(dir);
+    }
+
 } // namespace

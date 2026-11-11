@@ -7,6 +7,7 @@
 
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/core/Logger.hpp"
+#include "rhodium/core/WorkspaceLock.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -20,6 +21,11 @@ namespace rhodium
     int Commands::tree(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         BuildModel model;
         if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
         {

@@ -11,6 +11,7 @@
 #include "rhodium/toolchain/Toolchain.hpp"
 
 #include <string>
+#include <vector>
 
 namespace rhodium
 {
@@ -19,6 +20,24 @@ namespace rhodium
 
 namespace rhodium
 {
+    // One restore owns this snapshot; discovery and preferences are loaded once.
+    class ToolchainSnapshot
+    {
+    public:
+        explicit ToolchainSnapshot(std::filesystem::path workspaceRoot);
+        ToolchainSnapshot(std::filesystem::path workspaceRoot, std::vector<ToolchainProfile> profiles);
+        const std::vector<ToolchainProfile> &profiles(DiagnosticSink &diagnostics);
+        bool preferredToolchain(std::string &value, DiagnosticSink &diagnostics);
+
+    private:
+        std::filesystem::path workspaceRoot_;
+        std::vector<ToolchainProfile> profiles_;
+        std::string preferred_;
+        bool loaded_ = false;
+        bool preferenceLoaded_ = false;
+        bool preferenceOk_ = true;
+    };
+
     class BuildToolchain
     {
     public:

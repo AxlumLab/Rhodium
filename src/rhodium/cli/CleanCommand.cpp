@@ -1,3 +1,5 @@
+#include "rhodium/core/WorkspaceLock.hpp"
+
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
@@ -19,6 +21,11 @@ namespace rhodium
                      const std::string &packageName)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         if (all && (artifacts || sources || !packageName.empty()))
         {
             diagnostics.error("clean --all already removes the active state directory; do not combine it with --artifacts, --sources, or a package name");

@@ -15,11 +15,13 @@ namespace rhodium
 {
 
     class DiagnosticSink;
+    class ToolchainSnapshot;
 
     struct PackageBuildOptions
     {
         bool runBuild = true;
         bool runExport = true;
+        ToolchainSnapshot *toolchains = nullptr;
     };
 
     class PackageBuilder

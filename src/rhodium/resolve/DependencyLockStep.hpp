@@ -17,6 +17,7 @@ namespace rhodium
                                    const std::string &toolchainId);
         static std::string source(const std::filesystem::path &workspaceRoot,
                                   const DependencyDesc &dependency);
+        static void store(LockFile &lockFile, LockedPackage package, const LockedPackage *previous = nullptr);
 
     private:
         static bool same(const LockedPackage &package, const DependencyDesc &dependency);

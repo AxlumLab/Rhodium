@@ -1,6 +1,7 @@
 #include "rhodium/core/FileSystem.hpp"
 #include "rhodium/diagnostics/JsonDiagnosticSink.hpp"
 #include "rhodium/package/PackageCache.hpp"
+#include "rhodium/package/ToolchainContextResolver.hpp"
 #include "rhodium/resolve/DependencyBuildStep.hpp"
 #include "rhodium/toolchain/ToolchainRegistry.hpp"
 
@@ -16,19 +17,20 @@ namespace
     {
     protected:
         std::filesystem::path root;
+        std::string toolchainId;
         rhodium::DependencyDesc dependency;
         rhodium::DependencyRestoreOptions options;
-        rhodium::LockFile lockFile;
         rhodium::JsonDiagnosticSink diagnostics;
 
         void SetUp() override
         {
             const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
             root = std::filesystem::temp_directory_path() / ("rhodium-build-stage-" + std::to_string(stamp));
+            toolchainId = "rhodium-fixture-" + std::to_string(stamp);
             ASSERT_TRUE(rhodium::File::write(root / "source/input.txt", "first", nullptr));
             ASSERT_TRUE(rhodium::File::write(root / "dummy-tool", "unused", nullptr));
             rhodium::ToolchainProfile profile;
-            profile.id = "fixture";
+            profile.id = toolchainId;
             profile.platform = "linux";
             profile.compilerKind = "gcc";
             profile.compiler = profile.cxxCompiler = profile.linker = profile.archiver = profile.ninja = root / "dummy-tool";
@@ -56,15 +58,15 @@ namespace
 
         std::filesystem::path buildDir() const
         {
-            return root / ".rhodium/build-packages/Example/debug-fixture";
+            return root / ".rhodium/build-packages/Example" / ("debug-" + toolchainId);
         }
 
         bool run(const std::string &commit, rhodium::DepBuild::Result &result)
         {
             rhodium::PackageCache cache(root / ".rhodium/packages");
             const std::string config = "debug";
-            const std::string toolchain = "fixture";
-            rhodium::DepBuild::Context context{root, cache, lockFile, config, toolchain, options};
+            const std::string toolchain = toolchainId;
+            rhodium::DepBuild::Context context{root, cache, config, toolchain, options};
             return rhodium::DepBuild::run(dependency, root / "source", commit, nullptr, false, context, result, diagnostics);
         }
     };
@@ -149,5 +151,22 @@ namespace
         EXPECT_FALSE(std::filesystem::exists(buildDir() / ".tpkg_build_complete"));
         options.exportOnly = true;
         EXPECT_FALSE(run("local", result));
+    }
+
+    TEST_F(DependencyBuildStepTests, OneRestoreSnapshotSurvivesChangesToTheToolchainConfiguration)
+    {
+        rhodium::ToolchainSnapshot snapshot(root);
+        options.toolchains = &snapshot;
+        rhodium::DepBuild::Result result;
+        ASSERT_TRUE(run("commit-a", result)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::writeToolchainProfiles(root / "config/toolchains.toml", {}, diagnostics));
+        dependency.name = "Second";
+        ASSERT_TRUE(run("commit-a", result)) << diagnostics.diagnostics().dump();
+
+        rhodium::ToolchainSnapshot nextRestore(root);
+        options.toolchains = &nextRestore;
+        dependency.name = "Third";
+        EXPECT_FALSE(run("commit-a", result));
+        EXPECT_NE(diagnostics.diagnostics().dump().find("requested toolchain was not detected: " + toolchainId), std::string::npos);
     }
 }

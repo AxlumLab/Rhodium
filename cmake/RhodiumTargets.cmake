@@ -48,6 +48,9 @@ set(RHODIUM_CORE_SOURCES
 
 add_library(rhodium_core STATIC ${RHODIUM_CORE_SOURCES})
 target_include_directories(rhodium_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(WIN32)
+    target_link_libraries(rhodium_core PRIVATE advapi32)
+endif()
 target_compile_definitions(rhodium_core PUBLIC RHODIUM_VERSION=\"${PROJECT_VERSION}\")
 rhodium_link_core_dependencies(rhodium_core)
 
