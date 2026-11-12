@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/package/PackageBuilder.hpp"
 
 #include <map>
@@ -14,7 +16,7 @@
 namespace rhodium
 {
 
-    class CMakePackageBuilder final : public PackageBuilder
+    class RHODIUM_EXPORT CMakePackageBuilder final : public PackageBuilder
     {
     public:
         bool build(const PackageBuildRequest &request, PackageArtifact &artifact,

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string>
 
 namespace rhodium
@@ -19,7 +21,7 @@ namespace rhodium
         Success,
     };
 
-    struct Diagnostic
+    struct RHODIUM_EXPORT Diagnostic
     {
         static const char *name(DiagnosticLevel level);
 

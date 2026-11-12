@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/toolchain/ToolchainDetector.hpp"
 
 #include <filesystem>
@@ -14,7 +16,7 @@
 
 namespace rhodium
 {
-    class ToolProbe
+    class RHODIUM_EXPORT ToolProbe
     {
     public:
         static std::vector<std::string> paths(const std::string &value);

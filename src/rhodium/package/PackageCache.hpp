@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <filesystem>
@@ -13,7 +15,7 @@
 namespace rhodium
 {
 
-    class PackageCache
+    class RHODIUM_EXPORT PackageCache
     {
     public:
         explicit PackageCache(std::filesystem::path root);

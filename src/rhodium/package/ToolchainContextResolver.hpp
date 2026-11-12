@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageBuilderUtil.hpp"
 #include "rhodium/toolchain/Toolchain.hpp"
@@ -20,7 +22,7 @@ namespace rhodium
 
 namespace rhodium
 {
-    class BuildToolchain
+    class RHODIUM_EXPORT BuildToolchain
     {
     public:
         static bool populate(BuildUtil::Context &context, const std::string &preferredToolchain = {},

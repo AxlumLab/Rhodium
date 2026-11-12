@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 
 #include <filesystem>
@@ -23,7 +25,7 @@ namespace rhodium
         std::string packageFilter;
     };
 
-    class ArtifactGc
+    class RHODIUM_EXPORT ArtifactGc
     {
     public:
         static bool runArtifacts(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,

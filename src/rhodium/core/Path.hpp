@@ -1,11 +1,13 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <filesystem>
 #include <string>
 
 namespace rhodium
 {
-    class Path
+    class RHODIUM_EXPORT Path
     {
     public:
         // Prefer Rhodium names; reuse legacy names only when the new name is absent.

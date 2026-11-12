@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/diagnostics/DiagnosticSink.hpp"
 
 #include <filesystem>
@@ -24,7 +26,7 @@ namespace rhodium
 
     using CopyFilter = std::function<bool(const std::filesystem::path &)>;
 
-    class FileCopy
+    class RHODIUM_EXPORT FileCopy
     {
     public:
         static CopyStatus file(const std::filesystem::path &source,

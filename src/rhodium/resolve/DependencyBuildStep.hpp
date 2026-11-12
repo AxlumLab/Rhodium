@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageArtifact.hpp"
@@ -17,7 +19,7 @@ namespace rhodium
     class DiagnosticSink;
     class PackageCache;
 
-    class DepBuild
+    class RHODIUM_EXPORT DepBuild
     {
     public:
         struct Context

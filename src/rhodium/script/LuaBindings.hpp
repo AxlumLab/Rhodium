@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 
 #include <filesystem>
@@ -28,7 +30,7 @@ namespace rhodium
         std::filesystem::path manifestPath;
     };
 
-    class LuaBindings
+    class RHODIUM_EXPORT LuaBindings
     {
     public:
         static void bind(sol::state &lua, BuildModel &model, DiagnosticSink &diagnostics,

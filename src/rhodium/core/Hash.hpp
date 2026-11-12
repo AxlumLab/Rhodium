@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <cstddef>
 #include <string>
 
 namespace rhodium
 {
-    class Hash
+    class RHODIUM_EXPORT Hash
     {
     public:
         static std::string xxhash64Hex(const void *data, std::size_t size);

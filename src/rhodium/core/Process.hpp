@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -26,7 +28,7 @@ namespace rhodium
         std::string output;
     };
 
-    class Process
+    class RHODIUM_EXPORT Process
     {
     public:
         static ProcessResult run(const std::string &executable, const std::vector<std::string> &args);

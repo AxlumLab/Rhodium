@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -14,7 +16,7 @@
 namespace rhodium
 {
     // Utility class for toolchain configuration serialization
-    class ToolchainSerializer
+    class RHODIUM_EXPORT ToolchainSerializer
     {
     public:
         // Append path to TOML stream

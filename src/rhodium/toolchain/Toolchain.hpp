@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <rhodium/common.hpp>
 
 #include <string>
@@ -64,7 +66,7 @@ namespace rhodium
         std::vector<std::string> missing;
     };
 
-    class Toolchain
+    class RHODIUM_EXPORT Toolchain
     {
     public:
         static std::string contentHash(const ToolchainProfile &profile, const std::string &config);

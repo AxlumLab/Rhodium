@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 #include "rhodium/resolve/ResolvedDependencyArtifacts.hpp"
 
@@ -16,7 +18,7 @@
 
 namespace rhodium
 {
-    class JsonModel
+    class RHODIUM_EXPORT JsonModel
     {
     public:
         static nlohmann::json from(const BuildModel &model);

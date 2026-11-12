@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <filesystem>
@@ -24,7 +26,7 @@ namespace rhodium
         std::vector<std::string> patchHashes;
     };
 
-    class ArchiveExtractor
+    class RHODIUM_EXPORT ArchiveExtractor
     {
     public:
         bool available() const;
@@ -34,7 +36,7 @@ namespace rhodium
                      DiagnosticSink &diagnostics) const;
     };
 
-    class ArchiveFetcher
+    class RHODIUM_EXPORT ArchiveFetcher
     {
     public:
         bool available() const;

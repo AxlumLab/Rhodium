@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 #include "rhodium/model/DependencyOverride.hpp"
 
@@ -31,7 +33,7 @@ namespace rhodium
         DependencyRestoreOptions options;
     };
 
-    class DependencyResolver
+    class RHODIUM_EXPORT DependencyResolver
     {
     public:
         bool restore(const BuildModel &model, const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics,

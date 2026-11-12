@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/package/PackageArtifact.hpp"
 
 #include <sstream>
@@ -17,7 +19,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class ArtifactStore
+    class RHODIUM_EXPORT ArtifactStore
     {
     public:
         static bool write(const PackageArtifact &artifact, DiagnosticSink &diagnostics);

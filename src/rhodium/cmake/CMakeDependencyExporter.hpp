@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/resolve/ResolvedDependencyArtifacts.hpp"
 
 #include <filesystem>
@@ -20,7 +22,7 @@ namespace rhodium
         std::string linkage;
     };
 
-    class CMakeDependency
+    class RHODIUM_EXPORT CMakeDependency
     {
     public:
         static bool writeFiles(const std::vector<ResolvedDependencyArtifact> &packages,

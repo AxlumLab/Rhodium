@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <sol/sol.hpp>
@@ -16,7 +18,7 @@
 namespace rhodium
 {
 
-    class LuaOverlayReader
+    class RHODIUM_EXPORT LuaOverlayReader
     {
     public:
         static std::optional<sol::table> table(sol::table options, const char *field,

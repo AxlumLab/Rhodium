@@ -1,0 +1,26 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Lua)
+find_dependency(sol2 CONFIG)
+find_dependency(fmt CONFIG)
+find_dependency(nlohmann_json CONFIG)
+find_dependency(tomlplusplus CONFIG)
+include("${CMAKE_CURRENT_LIST_DIR}/RhodiumLua.cmake")
+
+if(NOT @BUILD_SHARED_LIBS@)
+    find_dependency(spdlog CONFIG)
+    find_dependency(CURL CONFIG)
+    find_dependency(LibArchive)
+    include("${CMAKE_CURRENT_LIST_DIR}/RhodiumArchive.cmake")
+    find_dependency(@RHODIUM_GIT_PACKAGE@ CONFIG)
+    find_dependency(@RHODIUM_XXHASH_PACKAGE@ CONFIG)
+    find_dependency(zstd CONFIG)
+endif()
+
+set(Rhodium_VERSION "@PROJECT_VERSION@")
+set(Rhodium_Core_FOUND TRUE)
+set(Rhodium_SHARED_LIBS @BUILD_SHARED_LIBS@)
+set(Rhodium_MSVC_RUNTIME_LIBRARY "@RHODIUM_MSVC_RUNTIME_LIBRARY@")
+include("${CMAKE_CURRENT_LIST_DIR}/RhodiumTargets.cmake")
+check_required_components(Rhodium)

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/diagnostics/DiagnosticSink.hpp"
 
 #include <nlohmann/json.hpp>
@@ -13,7 +15,7 @@
 namespace rhodium
 {
 
-    class JsonDiagnosticSink final : public DiagnosticSink
+    class RHODIUM_EXPORT JsonDiagnosticSink final : public DiagnosticSink
     {
     public:
         void report(const Diagnostic &diagnostic) override;

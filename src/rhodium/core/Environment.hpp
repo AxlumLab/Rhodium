@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string>
 
 namespace rhodium
 {
 
-    class Environment
+    class RHODIUM_EXPORT Environment
     {
     public:
         static std::string hostPlatformName();

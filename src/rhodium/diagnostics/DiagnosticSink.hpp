@@ -6,13 +6,15 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/diagnostics/Diagnostic.hpp"
 
 #include <string>
 
 namespace rhodium
 {
-    class DiagnosticSink
+    class RHODIUM_EXPORT DiagnosticSink
     {
     public:
         virtual ~DiagnosticSink();

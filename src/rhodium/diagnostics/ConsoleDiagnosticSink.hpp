@@ -6,11 +6,13 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/diagnostics/DiagnosticSink.hpp"
 
 namespace rhodium
 {
-    class ConsoleDiagnosticSink final : public DiagnosticSink
+    class RHODIUM_EXPORT ConsoleDiagnosticSink final : public DiagnosticSink
     {
     public:
         void report(const Diagnostic &diagnostic) override;

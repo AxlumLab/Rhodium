@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <filesystem>
@@ -15,7 +17,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class GitFetcher
+    class RHODIUM_EXPORT GitFetcher
     {
     public:
         bool initialize(DiagnosticSink &diagnostics) const;

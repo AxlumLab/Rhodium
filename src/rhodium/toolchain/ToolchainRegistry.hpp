@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/toolchain/Toolchain.hpp"
 
 #include <filesystem>
@@ -44,7 +46,7 @@ namespace rhodium
         std::vector<ToolchainOverrideRecord> overridden;
     };
 
-    class ToolchainRegistry
+    class RHODIUM_EXPORT ToolchainRegistry
     {
     public:
         static const char *name(ToolchainSource source);

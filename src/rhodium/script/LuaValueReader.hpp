@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <sol/sol.hpp>
 
 #include <map>
@@ -15,7 +17,7 @@
 namespace rhodium
 {
 
-    class LuaValueReader
+    class RHODIUM_EXPORT LuaValueReader
     {
     public:
         static std::string string(sol::table table, const char *key, const std::string &fallback = {});

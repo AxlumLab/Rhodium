@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 
 #include <vector>
@@ -9,7 +11,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class DepGraph
+    class RHODIUM_EXPORT DepGraph
     {
     public:
         static bool build(const BuildModel &model,

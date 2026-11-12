@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <filesystem>
@@ -19,7 +21,7 @@ namespace rhodium
 
 namespace rhodium
 {
-    class BuildUtil
+    class RHODIUM_EXPORT BuildUtil
     {
     public:
         struct Context

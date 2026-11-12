@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/config/BuildConfig.hpp"
 
@@ -12,7 +14,7 @@ namespace rhodium
     class DiagnosticSink;
     struct PackageArtifact;
 
-    class DepExport
+    class RHODIUM_EXPORT DepExport
     {
     public:
         static bool write(PackageArtifact &artifact, LockedPackage &updated, const std::filesystem::path &artifactDir,

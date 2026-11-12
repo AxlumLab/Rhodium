@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/resolve/DependencyResolver.hpp"
@@ -14,7 +16,7 @@ namespace rhodium
     class GitFetcher;
     class PackageCache;
 
-    class DepFetch
+    class RHODIUM_EXPORT DepFetch
     {
     public:
         struct Context

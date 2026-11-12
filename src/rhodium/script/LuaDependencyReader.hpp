@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 
 #include <sol/sol.hpp>
@@ -18,7 +20,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class LuaDependencyReader
+    class RHODIUM_EXPORT LuaDependencyReader
     {
     public:
         LuaDependencyReader(const std::string &activePlatform, const std::filesystem::path &workspaceRoot)

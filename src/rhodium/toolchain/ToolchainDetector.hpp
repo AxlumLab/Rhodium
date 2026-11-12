@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/toolchain/Toolchain.hpp"
 
 #include <filesystem>
@@ -15,7 +17,7 @@ namespace rhodium
 {
     class DiagnosticSink;
 
-    class ToolchainDetector
+    class RHODIUM_EXPORT ToolchainDetector
     {
     public:
         static void windows(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);

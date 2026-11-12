@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 
 #include <filesystem>
@@ -8,7 +10,7 @@
 namespace rhodium
 {
 
-    class DepLock
+    class RHODIUM_EXPORT DepLock
     {
     public:
         static LockedPackage *find(LockFile &lockFile,

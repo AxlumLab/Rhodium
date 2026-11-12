@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/package/PackageBuilder.hpp"
 
 namespace rhodium
 {
 
-    class HeaderOnlyPackageBuilder final : public PackageBuilder
+    class RHODIUM_EXPORT HeaderOnlyPackageBuilder final : public PackageBuilder
     {
     public:
         bool build(const PackageBuildRequest &request, PackageArtifact &artifact,

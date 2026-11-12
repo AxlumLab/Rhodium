@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <filesystem>
 #include <string>
 
 namespace rhodium
 {
-    class File
+    class RHODIUM_EXPORT File
     {
     public:
         static bool exists(const std::filesystem::path &path);

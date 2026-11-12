@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/package/PackageBuilderUtil.hpp"
 
 #include <map>
@@ -14,7 +16,7 @@
 
 namespace rhodium
 {
-    class BuildVar
+    class RHODIUM_EXPORT BuildVar
     {
     public:
         static std::string expand(std::string value, const BuildUtil::Context &context);

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/PackageDesc.hpp"
 #include "rhodium/model/WorkspaceDesc.hpp"
 
@@ -23,7 +25,7 @@ namespace rhodium
         std::string manifestName = "rhodium.lua";
     };
 
-    class ModelValidator
+    class RHODIUM_EXPORT ModelValidator
     {
     public:
         static bool validate(const BuildModel &model, DiagnosticSink &diagnostics);

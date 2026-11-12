@@ -69,6 +69,13 @@ require("fmt", {
 })
 ```
 
+## Library integration
+
+Rhodium can also be installed as a static or shared C++20 library. Link the
+`Rhodium::Core` target from `find_package(Rhodium CONFIG REQUIRED)`; the CLI
+is optional. See [Embedding Rhodium](docs/guide/embedding.md) for build,
+installation and host-program examples.
+
 ## Documentation
 
 Start here:

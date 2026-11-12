@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 #include "rhodium/model/DependencyOverride.hpp"
 
@@ -24,7 +26,7 @@ namespace rhodium
         std::map<std::string, std::string> paths;
     };
 
-    class DependencyOverrides
+    class RHODIUM_EXPORT DependencyOverrides
     {
     public:
         static std::filesystem::path path(const std::filesystem::path &workspaceRoot);

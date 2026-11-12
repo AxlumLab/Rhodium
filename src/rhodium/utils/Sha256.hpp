@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <filesystem>
 #include <string>
 
 namespace rhodium
 {
-    class Sha256
+    class RHODIUM_EXPORT Sha256
     {
     public:
         static std::string file(const std::filesystem::path &path, std::string *error = nullptr);

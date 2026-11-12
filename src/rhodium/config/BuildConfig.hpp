@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/diagnostics/DiagnosticSink.hpp"
 
 #include <string>
@@ -18,7 +20,7 @@ namespace rhodium
         std::string toolchainId;
     };
 
-    class BuildConfig
+    class RHODIUM_EXPORT BuildConfig
     {
     public:
         static std::string normalize(const std::string &input, const std::string &fallback = {});

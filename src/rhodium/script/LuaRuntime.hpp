@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <memory>
 
 namespace sol
@@ -16,7 +18,7 @@ namespace sol
 namespace rhodium
 {
 
-    class LuaRuntime
+    class RHODIUM_EXPORT LuaRuntime
     {
     public:
         LuaRuntime();

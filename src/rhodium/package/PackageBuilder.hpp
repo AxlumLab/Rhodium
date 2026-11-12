@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageArtifact.hpp"
 
@@ -36,7 +38,7 @@ namespace rhodium
         PackageBuildOptions options;
     };
 
-    class PackageBuilder
+    class RHODIUM_EXPORT PackageBuilder
     {
     public:
         virtual ~PackageBuilder() = default;

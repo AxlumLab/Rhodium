@@ -6,11 +6,13 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string>
 
 namespace rhodium
 {
-    class StringUtils
+    class RHODIUM_EXPORT StringUtils
     {
     public:
         static std::string toLower(std::string value);

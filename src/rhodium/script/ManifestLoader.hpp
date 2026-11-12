@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/BuildModel.hpp"
 
 #include <filesystem>
@@ -21,7 +23,7 @@ namespace rhodium
         BuildModel model;
     };
 
-    class ManifestLoader
+    class RHODIUM_EXPORT ManifestLoader
     {
     public:
         ManifestLoadResult load(const std::filesystem::path &manifestPath, DiagnosticSink &diagnostics);

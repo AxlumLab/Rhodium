@@ -1,8 +1,10 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 namespace rhodium {
 
-class GitResolver {
+class RHODIUM_EXPORT GitResolver {
 public:
     bool available() const;
 };

@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string>
 
 namespace rhodium
 {
 
-    class LuaCondition
+    class RHODIUM_EXPORT LuaCondition
     {
     public:
         static bool matches(const std::string &condition, const std::string &activePlatform);

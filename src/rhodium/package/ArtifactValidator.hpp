@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageBuilderUtil.hpp"
 
@@ -16,7 +18,7 @@ namespace rhodium
 
 namespace rhodium
 {
-    class ArtifactCheck
+    class RHODIUM_EXPORT ArtifactCheck
     {
     public:
         static bool validate(const BuildUtil::Context &context,

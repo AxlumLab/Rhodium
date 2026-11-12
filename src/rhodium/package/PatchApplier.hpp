@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -20,7 +22,7 @@ namespace rhodium
         int stripComponents = 0;
     };
 
-    class PatchApplier
+    class RHODIUM_EXPORT PatchApplier
     {
     public:
         bool apply(const std::filesystem::path &sourceDir, const std::filesystem::path &workspaceRoot,

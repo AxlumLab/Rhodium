@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string_view>
 #include <string>
 #include <utility>
@@ -26,7 +28,7 @@ namespace rhodium
         kSuccess
     };
 
-    class Logger final
+    class RHODIUM_EXPORT Logger final
     {
     private:
         void emitLog(const std::string &msg, LogLevel level);

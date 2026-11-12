@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/package/PackageBuilder.hpp"
 
 #include <vector>
@@ -13,7 +15,7 @@
 namespace rhodium
 {
 
-    class PrebuiltPackageBuilder final : public PackageBuilder
+    class RHODIUM_EXPORT PrebuiltPackageBuilder final : public PackageBuilder
     {
     public:
         bool build(const PackageBuildRequest &request, PackageArtifact &artifact,

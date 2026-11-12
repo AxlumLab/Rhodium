@@ -14,7 +14,9 @@ set(RHODIUM_TEST_SOURCES
 )
 
 add_executable(rhodium_tests ${RHODIUM_TEST_SOURCES})
-target_link_libraries(rhodium_tests PRIVATE rhodium_core GTest::gtest GTest::gtest_main)
+target_link_libraries(rhodium_tests PRIVATE rhodium_cli GTest::gtest GTest::gtest_main LibArchive::LibArchive)
+
+set_target_properties(rhodium_tests PROPERTIES MSVC_RUNTIME_LIBRARY "${RHODIUM_MSVC_RUNTIME_LIBRARY}")
 
 include(GoogleTest)
 gtest_discover_tests(rhodium_tests)

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "rhodium/export.hpp"
+
 namespace rhodium {
 
-class PackageResolver {
+class RHODIUM_EXPORT PackageResolver {
 public:
     bool available() const;
 };

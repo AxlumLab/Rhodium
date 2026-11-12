@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/config/BuildConfig.hpp"
 #include "rhodium/model/DependencyOverride.hpp"
@@ -20,7 +22,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class PackageArtifactResolver
+    class RHODIUM_EXPORT PackageArtifactResolver
     {
     public:
         bool load(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics);

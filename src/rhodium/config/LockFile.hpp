@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 
 #include <filesystem>
@@ -17,7 +19,7 @@ namespace rhodium
 {
     class DiagnosticSink;
 
-    struct LockedPackage
+    struct RHODIUM_EXPORT LockedPackage
     {
         std::string name;
         std::string source;
@@ -60,7 +62,7 @@ namespace rhodium
                                   const std::string &toolchainContentHash);
     };
 
-    struct LockFile
+    struct RHODIUM_EXPORT LockFile
     {
         int version = 1;
         std::vector<LockedPackage> packages;

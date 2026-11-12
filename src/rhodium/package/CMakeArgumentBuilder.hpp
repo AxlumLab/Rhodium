@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageBuilderUtil.hpp"
 
@@ -16,7 +18,7 @@
 
 namespace rhodium
 {
-    class CMakeArgs
+    class RHODIUM_EXPORT CMakeArgs
     {
     public:
         static std::map<std::string, std::string> options(const DependencyDesc &dependency);

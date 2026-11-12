@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "rhodium/export.hpp"
+
 #include <string>
 
 namespace rhodium
@@ -13,7 +15,7 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    class LuaDslDiagnostics
+    class RHODIUM_EXPORT LuaDslDiagnostics
     {
     public:
         static void unsupported(DiagnosticSink &diagnostics, const std::string &name);
