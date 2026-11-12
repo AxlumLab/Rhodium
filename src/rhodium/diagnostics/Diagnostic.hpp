@@ -21,10 +21,10 @@ namespace rhodium
 
     struct Diagnostic
     {
+        static const char *name(DiagnosticLevel level);
+
         DiagnosticLevel level = DiagnosticLevel::Info;
         std::string message;
     };
-
-    const char *toString(DiagnosticLevel level);
 
 } // namespace rhodium

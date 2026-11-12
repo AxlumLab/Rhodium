@@ -10,9 +10,7 @@
 namespace rhodium
 {
 
-    bool DepExport::write(PackageArtifact &artifact,
-                          LockedPackage &updated,
-                          const std::filesystem::path &artifactDir,
+    bool DepExport::write(PackageArtifact &artifact, LockedPackage &updated, const std::filesystem::path &artifactDir,
                           DiagnosticSink &diagnostics)
     {
         artifact.artifactId = updated.artifactId;
@@ -30,21 +28,14 @@ namespace rhodium
 
     bool DepExport::artifactsEqual(const DependencyArtifacts &left, const DependencyArtifacts &right)
     {
-        return left.mode == right.mode &&
-               left.includeDirs == right.includeDirs &&
-               left.libDirs == right.libDirs &&
-               left.binDirs == right.binDirs &&
-               left.binFiles == right.binFiles &&
-               left.libs == right.libs &&
-               left.libFiles == right.libFiles &&
-               left.libFilesByConfig == right.libFilesByConfig &&
-               left.defines == right.defines &&
-               left.systemLibs == right.systemLibs &&
+        return left.mode == right.mode && left.includeDirs == right.includeDirs && left.libDirs == right.libDirs &&
+               left.binDirs == right.binDirs && left.binFiles == right.binFiles && left.libs == right.libs &&
+               left.libFiles == right.libFiles && left.libFilesByConfig == right.libFilesByConfig &&
+               left.defines == right.defines && left.systemLibs == right.systemLibs &&
                left.frameworks == right.frameworks;
     }
 
-    bool DepExport::reusable(const LockedPackage &locked,
-                             const LockedPackage &expected,
+    bool DepExport::reusable(const LockedPackage &locked, const LockedPackage &expected,
                              const std::filesystem::path &artifactDir)
     {
         class NullDiagnosticSink final : public DiagnosticSink
@@ -53,32 +44,19 @@ namespace rhodium
             void report(const Diagnostic &) override {}
         };
 
-        if (locked.source != expected.source ||
-            locked.sourceType != expected.sourceType ||
-            locked.sha256 != expected.sha256 ||
-            locked.resolvedArchiveHash != expected.resolvedArchiveHash ||
-            locked.ref != expected.ref ||
-            locked.commit != expected.commit ||
-            locked.subdir != expected.subdir ||
-            locked.stripComponents != expected.stripComponents ||
-            locked.patches != expected.patches ||
-            locked.patchHashes != expected.patchHashes ||
-            locked.buildType != expected.buildType ||
-            locked.linkage != expected.linkage ||
-            locked.runtime != expected.runtime ||
-            locked.pic != expected.pic ||
-            locked.buildHash.empty() ||
-            locked.buildHash != expected.buildHash ||
-            locked.artifactId != expected.artifactId ||
-            locked.buildOptions != expected.buildOptions ||
+        if (locked.source != expected.source || locked.sourceType != expected.sourceType ||
+            locked.sha256 != expected.sha256 || locked.resolvedArchiveHash != expected.resolvedArchiveHash ||
+            locked.ref != expected.ref || locked.commit != expected.commit || locked.subdir != expected.subdir ||
+            locked.stripComponents != expected.stripComponents || locked.patches != expected.patches ||
+            locked.patchHashes != expected.patchHashes || locked.buildType != expected.buildType ||
+            locked.linkage != expected.linkage || locked.runtime != expected.runtime || locked.pic != expected.pic ||
+            locked.buildHash.empty() || locked.buildHash != expected.buildHash ||
+            locked.artifactId != expected.artifactId || locked.buildOptions != expected.buildOptions ||
             BuildConfig::normalize(locked.config) != BuildConfig::normalize(expected.config) ||
-            locked.toolchainId != expected.toolchainId ||
-            locked.overridden != expected.overridden ||
-            locked.overridePath != expected.overridePath ||
-            locked.overrideSource != expected.overrideSource ||
+            locked.toolchainId != expected.toolchainId || locked.overridden != expected.overridden ||
+            locked.overridePath != expected.overridePath || locked.overrideSource != expected.overrideSource ||
             locked.originalSource != expected.originalSource ||
-            locked.originalSourceType != expected.originalSourceType ||
-            locked.originalRef != expected.originalRef)
+            locked.originalSourceType != expected.originalSourceType || locked.originalRef != expected.originalRef)
         {
             return false;
         }
@@ -105,15 +83,16 @@ namespace rhodium
         return BuildUtil::validate(context, metadata, diagnostics);
     }
 
-    bool DepExport::gc(const LockFile &lockFile,
-                       const std::filesystem::path &workspaceRoot,
-                       const std::string &config,
-                       const std::string &toolchainId,
-                       const std::string &packageName,
-                       DiagnosticSink &diagnostics)
+    bool DepExport::gc(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
+                       const BuildSelection &selection, const std::string &packageName, DiagnosticSink &diagnostics)
     {
+        const auto &[config, toolchainId] = selection;
         return ArtifactGc::runArtifacts(lockFile, workspaceRoot, true, packageName, diagnostics) &&
-               ArtifactGc::runBuildCaches(lockFile, workspaceRoot, config, toolchainId, true, packageName, diagnostics) &&
+               ArtifactGc::runBuildCaches(
+                   lockFile, workspaceRoot,
+                   BuildCacheGcOptions{
+                       .config = config, .toolchainId = toolchainId, .apply = true, .packageFilter = packageName},
+                   diagnostics) &&
                ArtifactGc::runSourceCaches(lockFile, workspaceRoot, true, packageName, diagnostics);
     }
 

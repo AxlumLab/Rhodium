@@ -11,7 +11,11 @@
 namespace rhodium
 {
 
-    bool conditionMatches(const std::string &condition, const std::string &activePlatform);
-    bool isValidCondition(const std::string &condition);
+    class LuaCondition
+    {
+    public:
+        static bool matches(const std::string &condition, const std::string &activePlatform);
+        static bool valid(const std::string &condition);
+    };
 
 } // namespace rhodium

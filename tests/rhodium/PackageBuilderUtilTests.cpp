@@ -279,7 +279,17 @@ TEST(PackageBuilderUtilTests, CustomBuilderPreservesInstalledLibraryAndValidates
     rhodium::PackageArtifact artifact;
     rhodium::JsonDiagnosticSink diagnostics;
     rhodium::CustomPackageBuilder builder;
-    ASSERT_TRUE(builder.build(dependency, source, build, artifactDir, "local", root, {}, "debug", rhodium::PackageBuildOptions{}, artifact, diagnostics))
+    ASSERT_TRUE(builder.build(rhodium::PackageBuildRequest{
+    .dependency = dependency,
+    .sourceDir = source,
+    .buildDir = build,
+    .artifactDir = artifactDir,
+    .commit = "local",
+    .workspaceRoot = root,
+    .preferredToolchain = {},
+    .config = "debug",
+    .options = rhodium::PackageBuildOptions{}
+}, artifact, diagnostics))
         << diagnostics.diagnostics().dump();
     ASSERT_TRUE(rhodium::ArtifactStore::write(artifact, diagnostics)) << diagnostics.diagnostics().dump();
 

@@ -21,11 +21,18 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    void bindDsl(sol::state &lua,
-                 BuildModel &model,
-                 DiagnosticSink &diagnostics,
-                 const std::string &activePlatform,
-                 const std::filesystem::path &workspaceRoot = {},
-                 const std::filesystem::path &manifestPath = {});
+    struct LuaBindingOptions
+    {
+        std::string activePlatform;
+        std::filesystem::path workspaceRoot;
+        std::filesystem::path manifestPath;
+    };
+
+    class LuaBindings
+    {
+    public:
+        static void bind(sol::state &lua, BuildModel &model, DiagnosticSink &diagnostics,
+                         const LuaBindingOptions &options);
+    };
 
 } // namespace rhodium

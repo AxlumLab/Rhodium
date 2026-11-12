@@ -13,6 +13,10 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    void reportUnsupportedProjectDsl(DiagnosticSink &diagnostics, const std::string &name);
+    class LuaDslDiagnostics
+    {
+    public:
+        static void unsupported(DiagnosticSink &diagnostics, const std::string &name);
+    };
 
 } // namespace rhodium

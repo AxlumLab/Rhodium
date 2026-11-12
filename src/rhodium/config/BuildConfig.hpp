@@ -12,6 +12,12 @@
 
 namespace rhodium
 {
+    struct BuildSelection
+    {
+        std::string config = "debug";
+        std::string toolchainId;
+    };
+
     class BuildConfig
     {
     public:

@@ -38,10 +38,8 @@ namespace rhodium
     {
     public:
         static void add(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-        static void addMsvcRoots(std::vector<ToolchainProfile> &profiles,
-                                 const std::filesystem::path &vsRoot,
-                                 const std::filesystem::path &windowsSdkRoot,
-                                 DiagnosticSink &diagnostics);
+        static void addMsvcRoots(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &vsRoot,
+                                 const std::filesystem::path &windowsSdkRoot, DiagnosticSink &diagnostics);
 
     private:
         static std::filesystem::path vswhere();
@@ -59,25 +57,21 @@ namespace rhodium
         static std::map<std::string, std::string> vsEnv(const std::filesystem::path &vsRoot);
         static std::filesystem::path latestMsvc();
         static void addRuntime(ToolchainProfile &profile);
-        static ToolchainProfile clangCl(const std::filesystem::path &compiler,
-                                        const std::filesystem::path &binRoot,
-                                        const std::filesystem::path &toolRoot,
-                                        const std::filesystem::path &sdkRoot,
+        static ToolchainProfile clangCl(const std::filesystem::path &compiler, const std::filesystem::path &binRoot,
+                                        const std::filesystem::path &toolRoot, const std::filesystem::path &sdkRoot,
                                         const WindowsTargetArch &target);
         static void addClangCl(std::vector<ToolchainProfile> &profiles);
         static ToolchainProfile gcc();
         static ToolchainProfile clangGnu();
-        static ToolchainProfile msvc(const std::filesystem::path &vsRoot,
-                                     const std::filesystem::path &toolRoot,
+        static ToolchainProfile msvc(const std::filesystem::path &vsRoot, const std::filesystem::path &toolRoot,
                                      const std::filesystem::path &sdkRoot,
-                                     const std::map<std::string, std::string> &vsEnv,
-                                     const WindowsTargetArch &target);
+                                     const std::map<std::string, std::string> &vsEnv, const WindowsTargetArch &target);
         static void addMsvc(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
     };
 
     std::filesystem::path WinTc::vswhere()
     {
-        auto path = findExecutableOnPath("vswhere");
+        auto path = ToolchainDetector::findExecutable("vswhere");
         if (!path.empty())
         {
             return path;
@@ -98,7 +92,8 @@ namespace rhodium
     std::vector<std::filesystem::path> WinTc::vsRoots()
     {
         std::vector<std::filesystem::path> roots;
-        const auto addRoot = [&roots](const std::filesystem::path &path) {
+        const auto addRoot = [&roots](const std::filesystem::path &path)
+        {
             if (std::filesystem::is_directory(path))
             {
                 ToolProbe::appendUnique(roots, path);
@@ -116,12 +111,14 @@ namespace rhodium
         {
             addRoot(vcToolsInstallDir.parent_path().parent_path().parent_path().parent_path());
         }
-        addRoot(vsRootFromCompiler(findExecutableOnPath("cl")));
+        addRoot(vsRootFromCompiler(ToolchainDetector::findExecutable("cl")));
 
         const auto vswherePath = WinTc::vswhere();
         if (!vswherePath.empty())
         {
-            auto result = Process::run(vswherePath.string(), {"-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath"});
+            auto result = Process::run(vswherePath.string(), {"-products", "*", "-requires",
+                                                              "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                                                              "-property", "installationPath"});
             std::stringstream stream(result.output);
             std::string line;
             while (std::getline(stream, line))
@@ -190,8 +187,11 @@ namespace rhodium
             std::string data;
             parts >> name >> type;
             std::getline(parts, data);
-            data.erase(data.begin(), std::find_if(data.begin(), data.end(), [](unsigned char c)
-                                                  { return std::isspace(c) == 0; }));
+            data.erase(data.begin(), std::find_if(data.begin(), data.end(),
+                                                  [](unsigned char c)
+                                                  {
+                                                      return std::isspace(c) == 0;
+                                                  }));
             if (!data.empty())
             {
                 return data;
@@ -227,8 +227,11 @@ namespace rhodium
                 continue;
             }
             std::getline(parts, data);
-            data.erase(data.begin(), std::find_if(data.begin(), data.end(), [](unsigned char c)
-                                                  { return std::isspace(c) == 0; }));
+            data.erase(data.begin(), std::find_if(data.begin(), data.end(),
+                                                  [](unsigned char c)
+                                                  {
+                                                      return std::isspace(c) == 0;
+                                                  }));
             if (!name.empty() && !data.empty())
             {
                 paths.emplace_back(name, data);
@@ -254,11 +257,8 @@ namespace rhodium
         const auto toolsDir = msvcDir.parent_path();
         const auto vcDir = toolsDir.parent_path();
         const auto vsRoot = vcDir.parent_path();
-        if (binDir.filename() == "bin" &&
-            msvcDir.filename() == "MSVC" &&
-            toolsDir.filename() == "Tools" &&
-            vcDir.filename() == "VC" &&
-            std::filesystem::is_directory(vsRoot))
+        if (binDir.filename() == "bin" && msvcDir.filename() == "MSVC" && toolsDir.filename() == "Tools" &&
+            vcDir.filename() == "VC" && std::filesystem::is_directory(vsRoot))
         {
             return vsRoot;
         }
@@ -282,7 +282,7 @@ namespace rhodium
         }
         for (const auto &key : {
                  std::string("HKLM\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots"),
-                std::string("HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots"),
+                 std::string("HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots"),
              })
         {
             for (const auto *valueName : {"KitsRoot10", "KitsRoot81", "KitsRoot"})
@@ -336,15 +336,17 @@ namespace rhodium
             const auto version = entry.path().filename();
             const auto libRoot = sdkRoot / "Lib" / version;
             if (std::filesystem::is_directory(entry.path() / "um") &&
-                std::filesystem::is_directory(entry.path() / "ucrt") &&
-                std::filesystem::is_directory(libRoot / "um") &&
+                std::filesystem::is_directory(entry.path() / "ucrt") && std::filesystem::is_directory(libRoot / "um") &&
                 std::filesystem::is_directory(libRoot / "ucrt"))
             {
                 candidates.push_back(entry.path());
             }
         }
-        std::sort(candidates.begin(), candidates.end(), [](const auto &lhs, const auto &rhs)
-                  { return lhs.filename().string() > rhs.filename().string(); });
+        std::sort(candidates.begin(), candidates.end(),
+                  [](const auto &lhs, const auto &rhs)
+                  {
+                      return lhs.filename().string() > rhs.filename().string();
+                  });
         return candidates.empty() ? std::filesystem::path{} : candidates.front();
     }
 
@@ -422,7 +424,8 @@ namespace rhodium
                     if (File::dir(toolRoot / "lib" / profile.targetArch))
                     {
                         profile.environment["VCToolsInstallDir"] = toolRoot.string();
-                        profile.environment["VCINSTALLDIR"] = toolRoot.parent_path().parent_path().parent_path().string();
+                        profile.environment["VCINSTALLDIR"] =
+                            toolRoot.parent_path().parent_path().parent_path().string();
                         break;
                     }
                 }
@@ -480,7 +483,8 @@ namespace rhodium
         }
         auto capturedEnv = parseEnv(result.output);
         std::map<std::string, std::string> selected;
-        for (const auto *key : {"PATH", "INCLUDE", "LIB", "LIBPATH", "WindowsSdkDir", "VCINSTALLDIR", "VCToolsInstallDir"})
+        for (const auto *key :
+             {"PATH", "INCLUDE", "LIB", "LIBPATH", "WindowsSdkDir", "VCINSTALLDIR", "VCToolsInstallDir"})
         {
             auto it = capturedEnv.find(key);
             if (it != capturedEnv.end())
@@ -515,11 +519,9 @@ namespace rhodium
         ToolProbe::appendDir(profile.systemLibDirs, toolRoot / "lib" / profile.targetArch);
     }
 
-    ToolchainProfile WinTc::clangCl(const std::filesystem::path &compiler,
-                                               const std::filesystem::path &binRoot,
-                                               const std::filesystem::path &toolRoot,
-                                               const std::filesystem::path &sdkRoot,
-                                               const WindowsTargetArch &target)
+    ToolchainProfile WinTc::clangCl(const std::filesystem::path &compiler, const std::filesystem::path &binRoot,
+                                    const std::filesystem::path &toolRoot, const std::filesystem::path &sdkRoot,
+                                    const WindowsTargetArch &target)
     {
         ToolchainProfile profile;
         profile.id = std::string("windows-clangcl-") + target.idSuffix;
@@ -533,12 +535,12 @@ namespace rhodium
         profile.linker = ToolProbe::inDir(binRoot, "link");
         if (profile.linker.empty())
         {
-            profile.linker = findExecutableOnPath("lld-link");
+            profile.linker = ToolchainDetector::findExecutable("lld-link");
         }
         profile.archiver = ToolProbe::inDir(binRoot, "lib");
         if (profile.archiver.empty())
         {
-            profile.archiver = findExecutableOnPath("llvm-lib");
+            profile.archiver = ToolchainDetector::findExecutable("llvm-lib");
         }
         if (!profile.compiler.empty())
         {
@@ -559,7 +561,7 @@ namespace rhodium
 
     void WinTc::addClangCl(std::vector<ToolchainProfile> &profiles)
     {
-        const auto clangClExe = findExecutableOnPath("clang-cl");
+        const auto clangClExe = ToolchainDetector::findExecutable("clang-cl");
         if (clangClExe.empty())
         {
             return;
@@ -594,10 +596,10 @@ namespace rhodium
         profile.targetArch = "x64";
         profile.compilerKind = "gcc";
         profile.sdkKind = "mingw";
-        profile.compiler = findExecutableOnPath("gcc");
-        profile.cxxCompiler = findExecutableOnPath("g++");
+        profile.compiler = ToolchainDetector::findExecutable("gcc");
+        profile.cxxCompiler = ToolchainDetector::findExecutable("g++");
         profile.linker = profile.cxxCompiler.empty() ? profile.compiler : profile.cxxCompiler;
-        profile.archiver = findExecutableOnPath("ar");
+        profile.archiver = ToolchainDetector::findExecutable("ar");
         if (!profile.compiler.empty())
         {
             const auto binRoot = profile.compiler.parent_path();
@@ -625,13 +627,13 @@ namespace rhodium
         profile.targetArch = "x64";
         profile.compilerKind = "clang";
         profile.sdkKind = "none";
-        profile.compiler = findExecutableOnPath("clang");
-        profile.cxxCompiler = findExecutableOnPath("clang++");
+        profile.compiler = ToolchainDetector::findExecutable("clang");
+        profile.cxxCompiler = ToolchainDetector::findExecutable("clang++");
         profile.linker = profile.cxxCompiler.empty() ? profile.compiler : profile.cxxCompiler;
-        profile.archiver = findExecutableOnPath("llvm-ar");
+        profile.archiver = ToolchainDetector::findExecutable("llvm-ar");
         if (profile.archiver.empty())
         {
-            profile.archiver = findExecutableOnPath("ar");
+            profile.archiver = ToolchainDetector::findExecutable("ar");
         }
         if (!profile.compiler.empty())
         {
@@ -653,11 +655,9 @@ namespace rhodium
         return profile;
     }
 
-    ToolchainProfile WinTc::msvc(const std::filesystem::path &vsRoot,
-                                     const std::filesystem::path &toolRoot,
-                                     const std::filesystem::path &sdkRoot,
-                                     const std::map<std::string, std::string> &vsEnv,
-                                     const WindowsTargetArch &target)
+    ToolchainProfile WinTc::msvc(const std::filesystem::path &vsRoot, const std::filesystem::path &toolRoot,
+                                 const std::filesystem::path &sdkRoot, const std::map<std::string, std::string> &vsEnv,
+                                 const WindowsTargetArch &target)
     {
         const auto binRoot = toolRoot / "bin" / "Hostx64" / target.binArch;
         ToolchainProfile profile;
@@ -690,10 +690,8 @@ namespace rhodium
         return profile;
     }
 
-    void WinTc::addMsvcRoots(std::vector<ToolchainProfile> &profiles,
-                                         const std::filesystem::path &vsRoot,
-                                         const std::filesystem::path &windowsSdkRoot,
-                                         DiagnosticSink &diagnostics)
+    void WinTc::addMsvcRoots(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &vsRoot,
+                             const std::filesystem::path &windowsSdkRoot, DiagnosticSink &diagnostics)
     {
         (void)diagnostics;
         const auto toolRoot = ToolProbe::newest(vsRoot / "VC" / "Tools" / "MSVC");
@@ -738,15 +736,13 @@ namespace rhodium
         }
     }
 
-    void addWindowsMsvcProfilesFromRoots(std::vector<ToolchainProfile> &profiles,
-                                         const std::filesystem::path &vsRoot,
-                                         const std::filesystem::path &windowsSdkRoot,
-                                         DiagnosticSink &diagnostics)
+    void ToolchainDetector::windows(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &vsRoot,
+                                    const std::filesystem::path &windowsSdkRoot, DiagnosticSink &diagnostics)
     {
         WinTc::addMsvcRoots(profiles, vsRoot, windowsSdkRoot, diagnostics);
     }
 
-    void addWindowsProfiles(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics)
+    void ToolchainDetector::windows(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics)
     {
         WinTc::add(profiles, diagnostics);
     }

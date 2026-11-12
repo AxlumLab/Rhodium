@@ -18,12 +18,21 @@ namespace rhodium
 
     class DiagnosticSink;
 
-    DependencyDesc dependencyFromOptions(const std::string &idOrSource,
-                                         sol::table options,
-                                         bool local,
-                                         const std::string &activePlatform,
-                                         const std::filesystem::path &workspaceRoot);
-    void overlayDependencyOptions(sol::table options, DependencyDesc &dependency);
-    void readDependencyOverrides(sol::table table, BuildModel &model, DiagnosticSink &diagnostics);
+    class LuaDependencyReader
+    {
+    public:
+        LuaDependencyReader(const std::string &activePlatform, const std::filesystem::path &workspaceRoot)
+            : activePlatform(activePlatform), workspaceRoot(workspaceRoot)
+        {
+        }
+
+        DependencyDesc read(const std::string &idOrSource, sol::table options, bool local) const;
+        static void overlay(sol::table options, DependencyDesc &dependency);
+        static void overrides(sol::table table, BuildModel &model, DiagnosticSink &diagnostics);
+
+    private:
+        std::string activePlatform;
+        std::filesystem::path workspaceRoot;
+    };
 
 } // namespace rhodium

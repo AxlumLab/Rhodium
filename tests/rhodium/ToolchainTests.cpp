@@ -140,10 +140,10 @@ namespace
         profile.missing = {"windows_sdk", "rc", "mt"};
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::writeToolchainProfiles(path, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::write(path, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
 
         std::vector<rhodium::ToolchainProfile> loaded;
-        ASSERT_TRUE(rhodium::readToolchainProfiles(path, loaded, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::read(path, loaded, diagnostics)) << diagnostics.diagnostics().dump();
         ASSERT_EQ(loaded.size(), 1u);
         EXPECT_EQ(loaded[0].id, profile.id);
         EXPECT_EQ(loaded[0].compilerKind, "clang-cl");
@@ -199,8 +199,8 @@ namespace
         profile.systemLibDirs.push_back(lib);
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::writeUserToolchainProfiles(dir, rhodium::ToolchainSource::ProjectUser, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
-        const auto loaded = rhodium::loadMergedToolchains(dir, diagnostics);
+        ASSERT_TRUE(rhodium::ToolchainRegistry::writeUser(dir, rhodium::ToolchainSource::ProjectUser, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
+        const auto loaded = rhodium::ToolchainRegistry::load(dir, diagnostics);
         const auto manual = std::find_if(loaded.begin(), loaded.end(), [](const auto &loadedProfile) {
             return loadedProfile.profile.id == "manual-clang-x64";
         });
@@ -220,7 +220,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         std::vector<rhodium::ToolchainProfile> profiles;
-        rhodium::addWindowsMsvcProfilesFromRoots(profiles, vsRoot, sdkRoot, diagnostics);
+        rhodium::ToolchainDetector::windows(profiles, vsRoot, sdkRoot, diagnostics);
 
         const auto *x64 = findProfile(profiles, "windows-msvc-x64");
         const auto *x86 = findProfile(profiles, "windows-msvc-x86");
@@ -250,7 +250,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         std::vector<rhodium::ToolchainProfile> profiles;
-        rhodium::addWindowsMsvcProfilesFromRoots(profiles, vsRoot, sdkRoot, diagnostics);
+        rhodium::ToolchainDetector::windows(profiles, vsRoot, sdkRoot, diagnostics);
 
         const auto *x86 = findProfile(profiles, "windows-msvc-x86");
         ASSERT_NE(x86, nullptr);
@@ -262,7 +262,7 @@ namespace
 
     TEST(ToolchainTests, FindsExecutableOnPath)
     {
-        const auto cmake = rhodium::findExecutableOnPath("cmake");
+        const auto cmake = rhodium::ToolchainDetector::findExecutable("cmake");
         EXPECT_TRUE(cmake.empty() || rhodium::File::exists(cmake));
     }
 
@@ -274,10 +274,10 @@ namespace
         config.preferredToolchain = "windows-msvc-x64";
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::writeLocalToolchainConfig(dir, config, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::writeConfig(dir, config, diagnostics)) << diagnostics.diagnostics().dump();
 
         rhodium::LocalToolchainConfig loaded;
-        ASSERT_TRUE(rhodium::readLocalToolchainConfig(dir, loaded, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::readConfig(dir, loaded, diagnostics)) << diagnostics.diagnostics().dump();
         EXPECT_EQ(loaded.preferredToolchain, "windows-msvc-x64");
 
         std::filesystem::remove_all(dir);
@@ -304,7 +304,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         std::vector<rhodium::ToolchainProfile> profiles;
-        rhodium::addAndroidProfilesFromRoots(profiles, sdk, {}, diagnostics);
+        rhodium::ToolchainDetector::android(profiles, sdk, {}, diagnostics);
 
         ASSERT_EQ(profiles.size(), 4u);
         const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
@@ -352,7 +352,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         std::vector<rhodium::ToolchainProfile> profiles;
-        rhodium::addAndroidProfilesFromRoots(profiles, sdk, ndk, diagnostics);
+        rhodium::ToolchainDetector::android(profiles, sdk, ndk, diagnostics);
 
         const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
             return profile.id == "android-clang-arm64";
@@ -395,7 +395,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         std::vector<rhodium::ToolchainProfile> profiles;
-        rhodium::addAndroidProfilesFromRoots(profiles, sdk, ndk, diagnostics);
+        rhodium::ToolchainDetector::android(profiles, sdk, ndk, diagnostics);
 
         const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
             return profile.id == "android-clang-arm64";

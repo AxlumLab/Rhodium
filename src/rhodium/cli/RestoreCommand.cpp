@@ -20,98 +20,110 @@
 
 namespace rhodium
 {
-    class RestoreCli final
+    namespace
     {
-    public:
-        static std::string duration(std::chrono::milliseconds value)
+        class RestoreCli final
         {
-            auto ms = value.count();
-            if (ms < 1000)
+        public:
+            static std::string duration(std::chrono::milliseconds value)
             {
-                return std::to_string(ms) + "ms";
+                auto ms = value.count();
+                if (ms < 1000)
+                {
+                    return std::to_string(ms) + "ms";
+                }
+                else if (ms < 60000)
+                {
+                    double seconds = ms / 1000.0;
+                    return fmt::format("{:.1f}s", seconds);
+                }
+                else
+                {
+                    int minutes = static_cast<int>(ms / 60000);
+                    int seconds = static_cast<int>((ms % 60000) / 1000);
+                    return std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
+                }
             }
-            else if (ms < 60000)
-            {
-                double seconds = ms / 1000.0;
-                return fmt::format("{:.1f}s", seconds);
-            }
-            else
-            {
-                int minutes = static_cast<int>(ms / 60000);
-                int seconds = static_cast<int>((ms % 60000) / 1000);
-                return std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
-            }
-        }
-    };
+        };
+    }
 
-    int Commands::restore(const std::filesystem::path &workspaceRoot,
-                          const std::string &preferredToolchain,
-                          const std::string &configOption,
-                          const std::vector<std::string> &cliOverrides,
-                          bool locked,
-                          const std::string &packageName,
-                          bool buildOnly,
-                          bool exportOnly,
-                          bool rebuild,
-                          const std::string &updatePackage,
-                          bool updateAll)
+    namespace
     {
-        auto startTime = std::chrono::steady_clock::now();
+        class RestoreTimer final
+        {
+        public:
+            RestoreTimer(DiagnosticSink &diagnostics, std::chrono::steady_clock::time_point start)
+                : diagnostics(diagnostics), start(start)
+            {
+            }
+
+            int failed() const
+            {
+                diagnostics.error("restore failed (took " + elapsed() + ")");
+                return 1;
+            }
+
+            void completed(bool update) const
+            {
+                diagnostics.success((update ? "update completed (took " : "restore completed (took ") + elapsed() +
+                                    ")");
+            }
+
+        private:
+            std::string elapsed() const
+            {
+                return RestoreCli::duration(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start));
+            }
+
+            DiagnosticSink &diagnostics;
+            std::chrono::steady_clock::time_point start;
+        };
+    }
+
+    int Commands::restore(const std::filesystem::path &workspaceRoot, const RestoreRequest &request)
+    {
+        const auto &[preferredToolchain, configOption, cliOverrides, locked, packageName, buildOnly, exportOnly,
+                     rebuild, updatePackage, updateAll] = request;
+        const auto startTime = std::chrono::steady_clock::now();
 
         ConsoleDiagnosticSink diagnostics;
+        RestoreTimer timer(diagnostics, startTime);
         if (buildOnly && exportOnly)
         {
             diagnostics.error("restore --build-only and --export-only cannot be used together");
             return 1;
         }
-        const auto effectiveToolchain = preferredToolchainForCommand(workspaceRoot, preferredToolchain, diagnostics);
+        const auto effectiveToolchain = CliWorkspace::toolchain(workspaceRoot, preferredToolchain, diagnostics);
         if (effectiveToolchain.empty())
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
         ToolchainProfile selectedToolchain;
-        if (!selectToolchainForRestore(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
+        if (!CliWorkspace::selectToolchain(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
         BuildModel model;
         if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
         DependencyOverrideSet overrides;
-        if (!loadEffectiveDependencyOverrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
+        if (!CliWorkspace::overrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
-        const auto config = resolveCommandConfigWithState(model, workspaceRoot, configOption, diagnostics);
+        const auto config = CliWorkspace::config(model, configOption, diagnostics);
         if (config.empty())
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
 
         GitFetcher git;
         if (!git.initialize(diagnostics))
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
 
         DependencyResolver resolver;
@@ -123,18 +135,17 @@ namespace rhodium
         options.rebuild = rebuild;
         options.updatePackage = updatePackage;
         options.updateAll = updateAll;
-        options.toolchainContentHash = toolchainContentHash(selectedToolchain, config);
-        if (!resolver.restore(model, workspaceRoot, diagnostics, effectiveToolchain, config, overrides, options))
+        options.toolchainContentHash = Toolchain::contentHash(selectedToolchain, config);
+        if (!resolver.restore(model, workspaceRoot, diagnostics,
+                              DependencyRestoreRequest{.preferredToolchain = effectiveToolchain,
+                                                       .config = config,
+                                                       .overrides = overrides,
+                                                       .options = options}))
         {
-            auto endTime = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            diagnostics.error("restore failed (took " + RestoreCli::duration(duration) + ")");
-            return 1;
+            return timer.failed();
         }
 
-        auto endTime = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-        diagnostics.success((updateAll || !updatePackage.empty()) ? "update completed (took " + RestoreCli::duration(duration) + ")" : "restore completed (took " + RestoreCli::duration(duration) + ")");
+        timer.completed(updateAll || !updatePackage.empty());
         return 0;
     }
 

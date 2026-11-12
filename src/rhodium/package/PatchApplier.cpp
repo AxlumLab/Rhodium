@@ -46,13 +46,11 @@ namespace rhodium
         return out;
     }
 
-    bool PatchApplier::git(const std::filesystem::path &sourceDir,
-                           const std::filesystem::path &patch,
-                           const std::vector<std::string> &stripArgs,
-                           DiagnosticSink &diagnostics,
+    bool PatchApplier::git(const std::filesystem::path &sourceDir, const std::filesystem::path &patch,
+                           const std::vector<std::string> &stripArgs, DiagnosticSink &diagnostics,
                            std::string &lastError)
     {
-        auto git = findExecutableOnPath("git");
+        auto git = ToolchainDetector::findExecutable("git");
         if (git.empty())
         {
             lastError = "git executable not found";
@@ -82,12 +80,10 @@ namespace rhodium
         return true;
     }
 
-    bool PatchApplier::patch(const std::filesystem::path &sourceDir,
-                             const std::filesystem::path &patch,
-                             DiagnosticSink &diagnostics,
-                             const std::string &lastGitError)
+    bool PatchApplier::patch(const std::filesystem::path &sourceDir, const std::filesystem::path &patch,
+                             DiagnosticSink &diagnostics, const std::string &lastGitError)
     {
-        auto patchTool = findExecutableOnPath("patch");
+        auto patchTool = ToolchainDetector::findExecutable("patch");
         if (patchTool.empty())
         {
             diagnostics.error("patch apply failed: neither git nor patch command is available\n" + lastGitError);
@@ -108,13 +104,11 @@ namespace rhodium
         return true;
     }
 
-    bool PatchApplier::apply(const std::filesystem::path &sourceDir,
-                             const std::filesystem::path &workspaceRoot,
-                             const std::vector<std::string> &patches,
-                             int stripComponents,
-                             std::vector<std::string> &patchHashes,
+    bool PatchApplier::apply(const std::filesystem::path &sourceDir, const std::filesystem::path &workspaceRoot,
+                             const PatchOptions &options, std::vector<std::string> &patchHashes,
                              DiagnosticSink &diagnostics) const
     {
+        const auto &[patches, stripComponents] = options;
         patchHashes.clear();
         for (const auto &patchText : patches)
         {
@@ -125,7 +119,7 @@ namespace rhodium
                 return false;
             }
             std::string hashError;
-            const auto hash = sha256File(patchFile, &hashError);
+            const auto hash = Sha256::file(patchFile, &hashError);
             if (hash.empty())
             {
                 diagnostics.error("failed to hash patch " + patchFile.string() + ": " + hashError);

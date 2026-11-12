@@ -30,7 +30,8 @@ namespace rhodium
         return Path::manifest(workspaceRoot);
     }
 
-    bool CliWorkspace::load(const std::filesystem::path &workspaceRoot, BuildModel &model, ConsoleDiagnosticSink &diagnostics)
+    bool CliWorkspace::load(const std::filesystem::path &workspaceRoot, BuildModel &model,
+                            ConsoleDiagnosticSink &diagnostics)
     {
         ManifestLoader loader;
         auto result = loader.load(manifest(workspaceRoot), diagnostics);
@@ -42,117 +43,117 @@ namespace rhodium
         return true;
     }
 
-    std::string preferredToolchainForCommand(const std::filesystem::path &workspaceRoot, const std::string &toolchainId, DiagnosticSink &diagnostics);
-    bool selectToolchainForRestore(const std::filesystem::path &workspaceRoot,
-                                   const std::string &toolchainId,
-                                   ToolchainProfile &selectedToolchain,
-                                   DiagnosticSink &diagnostics);
-
-    bool loadEffectiveDependencyOverrides(const BuildModel &model,
-                                          const std::filesystem::path &workspaceRoot,
-                                          const std::vector<std::string> &cliOverrides,
-                                          DependencyOverrideSet &overrides,
-                                          DiagnosticSink &diagnostics)
+    bool CliWorkspace::overrides(const BuildModel &model, const std::filesystem::path &workspaceRoot,
+                                 const std::vector<std::string> &cliOverrides, DependencyOverrideSet &overrides,
+                                 DiagnosticSink &diagnostics)
     {
         return DependencyOverrides::make(model, workspaceRoot, cliOverrides, overrides, diagnostics);
     }
 
-    std::string resolveCommandConfig(const BuildModel &model, const std::string &configOption, DiagnosticSink &diagnostics)
+    std::string CliWorkspace::config(const BuildModel &model, const std::string &configOption,
+                                     DiagnosticSink &diagnostics)
     {
         const auto config = BuildConfig::normalize(configOption, model.workspace.defaultConfig);
         return BuildConfig::validate(config, diagnostics) ? config : std::string{};
     }
 
-    std::string dependenciesNotRestoredMessage(const std::string &config, const std::string &toolchainId)
+    std::string CliWorkspace::missingDependencies(const std::string &config, const std::string &toolchainId)
     {
         return "dependencies are not restored for config=" + config + " toolchain=" + toolchainId +
                "\nrun:\n  rhodium restore --config " + config + " --toolchain " + toolchainId +
                "\nor select a default toolchain:\n  rhodium sdk select " + toolchainId;
     }
 
-    std::string inferPackageMetadataValue(const LockFile &lockFile,
-                                          const std::string &config,
-                                          const std::string &toolchainId,
-                                          const std::string LockedPackage::*field)
+    namespace
     {
-        std::string value;
-        for (const auto &package : lockFile.packages)
+        class PackageMetadata final
         {
-            if (BuildConfig::normalize(package.config) != BuildConfig::normalize(config) || package.toolchainId != toolchainId)
+        public:
+            static std::string value(const LockFile &lockFile, const std::string &config,
+                                     const std::string &toolchainId, const std::string LockedPackage::*field)
             {
-                continue;
+                std::string value;
+                for (const auto &package : lockFile.packages)
+                {
+                    if (BuildConfig::normalize(package.config) != BuildConfig::normalize(config) ||
+                        package.toolchainId != toolchainId)
+                    {
+                        continue;
+                    }
+                    const auto &candidate = package.*field;
+                    if (candidate.empty() || candidate == "default")
+                    {
+                        continue;
+                    }
+                    if (value.empty())
+                    {
+                        value = candidate;
+                    }
+                    else if (value != candidate)
+                    {
+                        return "mixed";
+                    }
+                }
+                return value;
             }
-            const auto &candidate = package.*field;
-            if (candidate.empty() || candidate == "default")
-            {
-                continue;
-            }
-            if (value.empty())
-            {
-                value = candidate;
-            }
-            else if (value != candidate)
-            {
-                return "mixed";
-            }
-        }
-        return value;
+        };
     }
 
-    std::string inferRuntimeMetadata(const LockFile &lockFile, const std::string &config, const std::string &toolchainId)
+    std::string CliWorkspace::runtime(const LockFile &lockFile, const std::string &config,
+                                      const std::string &toolchainId)
     {
-        return inferPackageMetadataValue(lockFile, config, toolchainId, &LockedPackage::runtime);
+        return PackageMetadata::value(lockFile, config, toolchainId, &LockedPackage::runtime);
     }
 
-    std::string inferLinkageMetadata(const LockFile &lockFile, const std::string &config, const std::string &toolchainId)
+    std::string CliWorkspace::linkage(const LockFile &lockFile, const std::string &config,
+                                      const std::string &toolchainId)
     {
-        return inferPackageMetadataValue(lockFile, config, toolchainId, &LockedPackage::linkage);
+        return PackageMetadata::value(lockFile, config, toolchainId, &LockedPackage::linkage);
     }
 
-    std::string resolveCommandConfigWithState(const BuildModel &model,
-                                              const std::filesystem::path &workspaceRoot,
-                                              const std::string &configOption,
-                                              DiagnosticSink &diagnostics)
+    namespace
     {
-        (void)workspaceRoot;
-        return resolveCommandConfig(model, configOption, diagnostics);
-    }
-
-    bool isCompleteToolchainForBuild(const ToolchainProfile &profile, DiagnosticSink &diagnostics, bool allowIncomplete)
-    {
-        if (profile.complete)
+        class CliToolchainCheck final
         {
-            return true;
-        }
-        if (allowIncomplete)
-        {
-            diagnostics.warning("using incomplete toolchain: " + profile.id);
-            return true;
-        }
-        std::ostringstream missing;
-        for (std::size_t i = 0; i < profile.missing.size(); ++i)
-        {
-            if (i != 0)
+        public:
+            static bool complete(const ToolchainProfile &profile, DiagnosticSink &diagnostics, bool allowIncomplete)
             {
-                missing << ", ";
+                if (profile.complete)
+                {
+                    return true;
+                }
+                if (allowIncomplete)
+                {
+                    diagnostics.warning("using incomplete toolchain: " + profile.id);
+                    return true;
+                }
+                std::ostringstream missing;
+                for (std::size_t i = 0; i < profile.missing.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        missing << ", ";
+                    }
+                    missing << profile.missing[i];
+                }
+                diagnostics.error("toolchain " + profile.id + " is incomplete\nmissing: " +
+                                  (profile.missing.empty() ? std::string("-") : missing.str()) +
+                                  "\nrun:\n  rhodium sdk doctor");
+                return false;
             }
-            missing << profile.missing[i];
-        }
-        diagnostics.error("toolchain " + profile.id + " is incomplete\nmissing: " +
-                          (profile.missing.empty() ? std::string("-") : missing.str()) +
-                          "\nrun:\n  rhodium sdk doctor");
-        return false;
+        };
     }
 
-    bool selectToolchainForRestore(const std::filesystem::path &workspaceRoot,
-                                   const std::string &toolchainId,
-                                   ToolchainProfile &selectedToolchain,
-                                   DiagnosticSink &diagnostics)
+    bool CliWorkspace::selectToolchain(const std::filesystem::path &workspaceRoot, const std::string &toolchainId,
+                                       ToolchainProfile &selectedToolchain, DiagnosticSink &diagnostics)
     {
-        const auto loadedProfiles = loadMergedToolchains(workspaceRoot, diagnostics);
-        const auto profiles = unwrapToolchainProfiles(loadedProfiles);
-        const auto found = std::find_if(profiles.begin(), profiles.end(), [&](const ToolchainProfile &profile)
-                                        { return profile.id == toolchainId; });
+        const auto loadedProfiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
+        const auto profiles = ToolchainRegistry::profiles(loadedProfiles);
+        const auto found = std::find_if(profiles.begin(), profiles.end(),
+                                        [&](const ToolchainProfile &profile)
+                                        {
+                                            return profile.id == toolchainId;
+                                        });
         if (found == profiles.end())
         {
             diagnostics.error("requested toolchain was not found: " + toolchainId +
@@ -160,17 +161,18 @@ namespace rhodium
             return false;
         }
         selectedToolchain = *found;
-        return isCompleteToolchainForBuild(selectedToolchain, diagnostics, false);
+        return CliToolchainCheck::complete(selectedToolchain, diagnostics, false);
     }
 
-    std::string preferredToolchainForCommand(const std::filesystem::path &workspaceRoot, const std::string &toolchainId, DiagnosticSink &diagnostics)
+    std::string CliWorkspace::toolchain(const std::filesystem::path &workspaceRoot, const std::string &toolchainId,
+                                        DiagnosticSink &diagnostics)
     {
         if (!toolchainId.empty())
         {
             return toolchainId;
         }
         LocalToolchainConfig config;
-        if (!readLocalToolchainConfig(workspaceRoot, config, diagnostics))
+        if (!ToolchainRegistry::readConfig(workspaceRoot, config, diagnostics))
         {
             return {};
         }

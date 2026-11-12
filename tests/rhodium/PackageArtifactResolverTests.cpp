@@ -124,7 +124,7 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::PackageArtifactResolver resolver;
-        ASSERT_TRUE(resolver.load(lockFile, root, "debug", "windows-msvc-x64", rhodium::DependencyOverrideSet{}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.load(lockFile, root, rhodium::BuildSelection{"debug", "windows-msvc-x64"}, rhodium::DependencyOverrideSet{}, diagnostics)) << diagnostics.diagnostics().dump();
         const auto *resolved = resolver.find("Pkg");
         ASSERT_NE(resolved, nullptr);
         ASSERT_EQ(resolved->libs.size(), 1u);
@@ -145,13 +145,13 @@ namespace
 
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::PackageArtifactResolver resolver;
-        ASSERT_TRUE(resolver.load(lockFile, root, "debug", "windows-msvc-x64", rhodium::DependencyOverrideSet{}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.load(lockFile, root, rhodium::BuildSelection{"debug", "windows-msvc-x64"}, rhodium::DependencyOverrideSet{}, diagnostics)) << diagnostics.diagnostics().dump();
         ASSERT_NE(resolver.find("Pkg"), nullptr);
         EXPECT_EQ(resolver.find("Pkg")->libs[0], "PkgNormal");
 
         rhodium::DependencyOverrideSet overrides;
         overrides.overrides["Pkg"].path = "C:/override/Pkg";
-        ASSERT_TRUE(resolver.load(lockFile, root, "debug", "windows-msvc-x64", overrides, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.load(lockFile, root, rhodium::BuildSelection{"debug", "windows-msvc-x64"}, overrides, diagnostics)) << diagnostics.diagnostics().dump();
         ASSERT_NE(resolver.find("Pkg"), nullptr);
         EXPECT_EQ(resolver.find("Pkg")->libs[0], "PkgOverride");
 

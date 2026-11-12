@@ -14,16 +14,7 @@ namespace rhodium
     class HeaderOnlyPackageBuilder final : public PackageBuilder
     {
     public:
-        bool build(const DependencyDesc &dependency,
-                   const std::filesystem::path &sourceDir,
-                   const std::filesystem::path &buildDir,
-                   const std::filesystem::path &artifactDir,
-                   const std::string &commit,
-                   const std::filesystem::path &workspaceRoot,
-                   const std::string &preferredToolchain,
-                   const std::string &config,
-                   const PackageBuildOptions &options,
-                   PackageArtifact &artifact,
+        bool build(const PackageBuildRequest &request, PackageArtifact &artifact,
                    DiagnosticSink &diagnostics) const override;
     };
 

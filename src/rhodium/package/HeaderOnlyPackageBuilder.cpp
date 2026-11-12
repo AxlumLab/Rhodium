@@ -13,18 +13,11 @@
 namespace rhodium
 {
 
-    bool HeaderOnlyPackageBuilder::build(const DependencyDesc &dependency,
-                                         const std::filesystem::path &sourceDir,
-                                         const std::filesystem::path &,
-                                         const std::filesystem::path &artifactDir,
-                                         const std::string &commit,
-                                         const std::filesystem::path &workspaceRoot,
-                                         const std::string &preferredToolchain,
-                                         const std::string &config,
-                                         const PackageBuildOptions &options,
-                                         PackageArtifact &artifact,
+    bool HeaderOnlyPackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
                                          DiagnosticSink &diagnostics) const
     {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
         (void)preferredToolchain;
         if (!options.runExport)
         {

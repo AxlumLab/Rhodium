@@ -99,7 +99,13 @@ namespace
     {
         std::filesystem::create_directories(root / ".tpkg");
         std::filesystem::create_directories(root / ".rhodium");
-        EXPECT_EQ(rhodium::Commands::clean(root, true, false, false, false, ""), 0);
+        EXPECT_EQ(rhodium::Commands::clean(root, rhodium::CleanOptions{
+    .all = true,
+    .artifacts = false,
+    .sources = false,
+    .lock = false,
+    .packageName = ""
+}), 0);
         EXPECT_FALSE(std::filesystem::exists(root / ".rhodium"));
         EXPECT_TRUE(std::filesystem::exists(root / ".tpkg"));
     }

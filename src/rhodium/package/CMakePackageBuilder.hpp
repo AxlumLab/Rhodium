@@ -17,23 +17,13 @@ namespace rhodium
     class CMakePackageBuilder final : public PackageBuilder
     {
     public:
-        bool build(const DependencyDesc &dependency,
-                   const std::filesystem::path &sourceDir,
-                   const std::filesystem::path &buildDir,
-                   const std::filesystem::path &artifactDir,
-                   const std::string &commit,
-                   const std::filesystem::path &workspaceRoot,
-                   const std::string &preferredToolchain,
-                   const std::string &config,
-                   const PackageBuildOptions &options,
-                   PackageArtifact &artifact,
+        bool build(const PackageBuildRequest &request, PackageArtifact &artifact,
                    DiagnosticSink &diagnostics) const override;
 
     private:
-        static bool run(const std::string &cmake,
-                        const std::vector<std::string> &args,
-                        const std::map<std::string, std::string> &environment,
-                        DiagnosticSink &diagnostics);
+        class Stages;
+        static bool run(const std::string &cmake, const std::vector<std::string> &args,
+                        const std::map<std::string, std::string> &environment, DiagnosticSink &diagnostics);
     };
 
 } // namespace rhodium

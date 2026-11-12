@@ -23,38 +23,24 @@
 namespace rhodium
 {
 
-    bool DepBuild::run(const DependencyDesc &dependency,
-                       const std::filesystem::path &sourceRoot,
-                       const std::string &commit,
-                       LockedPackage *locked,
-                       bool wantsUpdate,
-                       const Context &context,
-                       Result &result,
-                       DiagnosticSink &diagnostics)
+    bool DepBuild::run(const Request &request, const Context &context, Result &result, DiagnosticSink &diagnostics)
     {
+        const auto &[dependency, sourceRoot, commit, locked, wantsUpdate] = request;
         result = {};
-        result.updated = LockedPackage::from(dependency,
-                                              commit,
-                                              context.effectiveConfig,
-                                              context.preferredToolchain,
-                                              context.options.toolchainContentHash);
+        result.updated = LockedPackage::from(dependency, commit, context.effectiveConfig, context.preferredToolchain,
+                                             context.options.toolchainContentHash);
         result.updated.source = DepLock::source(context.workspaceRoot, dependency);
 
         const auto buildKey = key(context.effectiveConfig, context.preferredToolchain);
         const auto buildDir = context.cache.build(dependency, buildKey);
         result.artifactDir = Path::stateRoot(context.workspaceRoot) / "artifacts" / result.updated.artifactId;
-        const bool artifactReusable = !dependency.local &&
-                                      locked &&
-                                      !wantsUpdate &&
+        const bool artifactReusable = !dependency.local && locked && !wantsUpdate &&
                                       DepExport::reusable(*locked, result.updated, result.artifactDir);
         if (artifactReusable && !context.options.buildOnly && !context.options.rebuild)
         {
             diagnostics.info("package artifact is up to date; skipping build: " + dependency.name);
-            if (!DepExport::gc(context.lockFile,
-                               context.workspaceRoot,
-                               context.effectiveConfig,
-                               context.preferredToolchain,
-                               dependency.name,
+            if (!DepExport::gc(context.lockFile, context.workspaceRoot,
+                               BuildSelection{context.effectiveConfig, context.preferredToolchain}, dependency.name,
                                diagnostics))
             {
                 return false;
@@ -66,16 +52,14 @@ namespace rhodium
         {
             return false;
         }
-        removeSiblings(context.cache,
-                       dependency,
-                       buildKey,
-                       retained(context.lockFile, dependency.name, buildKey),
+        removeSiblings(context.cache, dependency, buildKey, retained(context.lockFile, dependency.name, buildKey),
                        diagnostics);
         const bool hasBuildStage = hasStage(dependency);
         bool buildDirExists = File::dir(buildDir);
         if (buildDirExists && hasCMakeCache(buildDir) && !cacheMatchesDir(buildDir))
         {
-            diagnostics.warning("cmake build cache was moved from another path; removing it before rebuild: " + buildDir.string());
+            diagnostics.warning("cmake build cache was moved from another path; removing it before rebuild: " +
+                                buildDir.string());
             if (!removeBeforeRebuild(buildDir, diagnostics))
             {
                 return false;
@@ -84,43 +68,49 @@ namespace rhodium
         }
         PackageBuildOptions buildOptions;
         const bool completedBuildStage = buildDirExists && completed(buildDir);
-        buildOptions.runBuild = hasBuildStage && !context.options.exportOnly && (context.options.buildOnly || context.options.rebuild || !completedBuildStage);
+        buildOptions.runBuild = hasBuildStage && !context.options.exportOnly &&
+                                (context.options.buildOnly || context.options.rebuild || !completedBuildStage);
         buildOptions.runExport = !context.options.buildOnly;
 
         if (context.options.exportOnly && hasBuildStage && !completedBuildStage)
         {
-            diagnostics.error("restore --export-only requires a completed build directory for package " + dependency.name + ": " + buildDir.string());
+            diagnostics.error("restore --export-only requires a completed build directory for package " +
+                              dependency.name + ": " + buildDir.string());
             return false;
         }
 
         auto packageBuilder = builder(dependency);
-        if (!packageBuilder->build(dependency,
-                            subdir(sourceRoot, dependency),
-                            buildDir,
-                            result.artifactDir,
-                            commit,
-                            context.workspaceRoot,
-                            context.preferredToolchain,
-                            context.effectiveConfig,
-                            buildOptions,
-                            result.artifact,
-                            diagnostics))
+        if (!packageBuilder->build(PackageBuildRequest{.dependency = dependency,
+                                                       .sourceDir = subdir(sourceRoot, dependency),
+                                                       .buildDir = buildDir,
+                                                       .artifactDir = result.artifactDir,
+                                                       .commit = commit,
+                                                       .workspaceRoot = context.workspaceRoot,
+                                                       .preferredToolchain = context.preferredToolchain,
+                                                       .config = context.effectiveConfig,
+                                                       .options = buildOptions},
+                                   result.artifact, diagnostics))
         {
-            diagnostics.error("failed to build package: " + dependency.name);
-            diagnostics.info("build directory: " + buildDir.string());
-            diagnostics.info("source directory: " + subdir(sourceRoot, dependency).string());
-
-            if (dependency.sourceType == "git" && !dependency.ref.empty())
-            {
-                diagnostics.info("specified ref: " + dependency.ref);
-                diagnostics.info("tip: check if the ref exists in the repository");
-                diagnostics.info("tip: run 'git tag' or 'git branch -r' in the source directory to see available versions");
-            }
-
+            reportFailure(dependency, sourceRoot, buildDir, diagnostics);
             return false;
         }
 
         return true;
+    }
+
+    void DepBuild::reportFailure(const DependencyDesc &dependency, const std::filesystem::path &sourceRoot,
+                                 const std::filesystem::path &buildDir, DiagnosticSink &diagnostics)
+    {
+        diagnostics.error("failed to build package: " + dependency.name);
+        diagnostics.info("build directory: " + buildDir.string());
+        diagnostics.info("source directory: " + subdir(sourceRoot, dependency).string());
+
+        if (dependency.sourceType == "git" && !dependency.ref.empty())
+        {
+            diagnostics.info("specified ref: " + dependency.ref);
+            diagnostics.info("tip: check if the ref exists in the repository");
+            diagnostics.info("tip: run 'git tag' or 'git branch -r' in the source directory to see available versions");
+        }
     }
 
     std::unique_ptr<PackageBuilder> DepBuild::builder(const DependencyDesc &dependency)
@@ -186,8 +176,7 @@ namespace rhodium
         return BuildConfig::normalize(config) + "-" + (toolchainId.empty() ? std::string("default") : toolchainId);
     }
 
-    std::set<std::string> DepBuild::retained(const LockFile &lockFile,
-                                             const std::string &packageName,
+    std::set<std::string> DepBuild::retained(const LockFile &lockFile, const std::string &packageName,
                                              const std::string &currentPkgKey)
     {
         std::set<std::string> keys{currentPkgKey};
@@ -202,10 +191,8 @@ namespace rhodium
         return keys;
     }
 
-    void DepBuild::removeSiblings(const PackageCache &cache,
-                                  const DependencyDesc &dependency,
-                                  const std::string &currentPkgKey,
-                                  const std::set<std::string> &keepKeys,
+    void DepBuild::removeSiblings(const PackageCache &cache, const DependencyDesc &dependency,
+                                  const std::string &currentPkgKey, const std::set<std::string> &keepKeys,
                                   DiagnosticSink &diagnostics)
     {
         const auto buildRoot = cache.build(dependency, currentPkgKey).parent_path();
@@ -235,7 +222,8 @@ namespace rhodium
             std::filesystem::remove_all(entry.path(), ec);
             if (ec)
             {
-                diagnostics.warning("failed to remove stale package build cache " + entry.path().string() + ": " + ec.message());
+                diagnostics.warning("failed to remove stale package build cache " + entry.path().string() + ": " +
+                                    ec.message());
                 ec.clear();
             }
             else
@@ -245,8 +233,7 @@ namespace rhodium
         }
     }
 
-    bool DepBuild::removeBeforeRebuild(const std::filesystem::path &buildDir,
-                                       DiagnosticSink &diagnostics)
+    bool DepBuild::removeBeforeRebuild(const std::filesystem::path &buildDir, DiagnosticSink &diagnostics)
     {
         std::error_code ec;
         if (!std::filesystem::is_directory(buildDir, ec))
@@ -291,7 +278,8 @@ namespace rhodium
             if (line.rfind("CMAKE_CACHEFILE_DIR:INTERNAL=", 0) == 0)
             {
                 const std::string prefix = "CMAKE_CACHEFILE_DIR:INTERNAL=";
-                const auto actual = StringUtils::toLower(std::filesystem::path(line.substr(prefix.size())).lexically_normal().generic_string());
+                const auto actual = StringUtils::toLower(
+                    std::filesystem::path(line.substr(prefix.size())).lexically_normal().generic_string());
                 return actual == expected;
             }
         }
@@ -300,10 +288,8 @@ namespace rhodium
 
     bool DepBuild::hasStage(const DependencyDesc &dependency)
     {
-        return dependency.buildType == "cmake" ||
-               dependency.buildType == "make" ||
-               dependency.buildType == "configure_make" ||
-               dependency.buildType == "custom";
+        return dependency.buildType == "cmake" || dependency.buildType == "make" ||
+               dependency.buildType == "configure_make" || dependency.buildType == "custom";
     }
 
     bool DepBuild::completed(const std::filesystem::path &buildDir)

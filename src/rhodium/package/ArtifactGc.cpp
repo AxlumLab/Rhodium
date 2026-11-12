@@ -18,11 +18,8 @@
 
 namespace rhodium
 {
-    bool ArtifactGc::runArtifacts(const LockFile &lockFile,
-                                  const std::filesystem::path &workspaceRoot,
-                                  bool apply,
-                                  const std::string &packageFilter,
-                                  DiagnosticSink &diagnostics)
+    bool ArtifactGc::runArtifacts(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,
+                                  const std::string &packageFilter, DiagnosticSink &diagnostics)
     {
         std::set<std::string> referenced;
         for (const auto &package : lockFile.packages)
@@ -65,10 +62,8 @@ namespace rhodium
                 }
                 ++deleteCount;
                 diagnostics.info(std::string(apply ? "artifact gc delete " : "artifact gc dry-run ") +
-                                 "artifact_id=" + artifactId +
-                                 " package=" + packageName +
-                                 " path=" + artifactDir.path().string() +
-                                 " reason=not referenced by lockfile");
+                                 "artifact_id=" + artifactId + " package=" + packageName +
+                                 " path=" + artifactDir.path().string() + " reason=not referenced by lockfile");
                 if (apply)
                 {
                     std::error_code ec;
@@ -88,18 +83,16 @@ namespace rhodium
         return true;
     }
 
-    bool ArtifactGc::runBuildCaches(const LockFile &lockFile,
-                                    const std::filesystem::path &workspaceRoot,
-                                    const std::string &config,
-                                    const std::string &toolchainId,
-                                    bool apply,
-                                    const std::string &packageFilter,
-                                    DiagnosticSink &diagnostics)
+    bool ArtifactGc::runBuildCaches(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
+                                    const BuildCacheGcOptions &request, DiagnosticSink &diagnostics)
     {
+        const auto &[config, toolchainId, apply, packageFilter] = request;
         std::map<std::string, std::set<std::string>> keepKeysByPackage;
         for (const auto &package : lockFile.packages)
         {
-            keepKeysByPackage[package.name].insert(BuildConfig::normalize(package.config) + "-" + (package.toolchainId.empty() ? std::string("default") : package.toolchainId));
+            keepKeysByPackage[package.name].insert(
+                BuildConfig::normalize(package.config) + "-" +
+                (package.toolchainId.empty() ? std::string("default") : package.toolchainId));
         }
 
         const auto buildRoot = Path::stateRoot(workspaceRoot) / "build-packages";
@@ -111,7 +104,8 @@ namespace rhodium
 
         if (!packageFilter.empty() && keepKeysByPackage.find(packageFilter) != keepKeysByPackage.end())
         {
-            keepKeysByPackage[packageFilter].insert(BuildConfig::normalize(config) + "-" + (toolchainId.empty() ? std::string("default") : toolchainId));
+            keepKeysByPackage[packageFilter].insert(BuildConfig::normalize(config) + "-" +
+                                                    (toolchainId.empty() ? std::string("default") : toolchainId));
         }
         int deleteCount = 0;
         for (const auto &packageDir : std::filesystem::directory_iterator(buildRoot))
@@ -141,17 +135,18 @@ namespace rhodium
                 }
                 ++deleteCount;
                 diagnostics.info(std::string(apply ? "build cache gc delete " : "build cache gc dry-run ") +
-                                 "package=" + packageName +
-                                 " cache=" + cacheName +
+                                 "package=" + packageName + " cache=" + cacheName +
                                  " path=" + cacheDir.path().string() +
-                                 (packageDeclared ? " reason=not current build workspace" : " reason=package not referenced by lockfile"));
+                                 (packageDeclared ? " reason=not current build workspace"
+                                                  : " reason=package not referenced by lockfile"));
                 if (apply)
                 {
                     std::error_code ec;
                     std::filesystem::remove_all(cacheDir.path(), ec);
                     if (ec)
                     {
-                        diagnostics.error("failed to delete build cache " + cacheDir.path().string() + ": " + ec.message());
+                        diagnostics.error("failed to delete build cache " + cacheDir.path().string() + ": " +
+                                          ec.message());
                         return false;
                     }
                 }
@@ -164,166 +159,210 @@ namespace rhodium
         return true;
     }
 
-    bool ArtifactGc::runSourceCaches(const LockFile &lockFile,
-                                     const std::filesystem::path &workspaceRoot,
-                                     bool apply,
-                                     const std::string &packageFilter,
-                                     DiagnosticSink &diagnostics)
+    namespace
     {
-        PackageCache cache(Path::stateRoot(workspaceRoot) / "packages");
-        std::set<std::filesystem::path> keepGitSources;
-        std::set<std::filesystem::path> keepArchiveRoots;
-        std::set<std::string> keptArchivePackages;
-
-        for (const auto &package : lockFile.packages)
+        class SourceCacheGc final
         {
-            if (!packageFilter.empty() && package.name != packageFilter)
+        public:
+            SourceCacheGc(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,
+                          const std::string &packageFilter, DiagnosticSink &diagnostics)
+                : lockFile(lockFile), apply(apply), packageFilter(packageFilter), diagnostics(diagnostics),
+                  cache(Path::stateRoot(workspaceRoot) / "packages"),
+                  packagesRoot(Path::stateRoot(workspaceRoot) / "packages")
             {
-                continue;
             }
-            if (package.sourceType == "git")
+
+            bool run()
             {
-                DependencyDesc dependency;
-                dependency.name = package.name;
-                dependency.source = package.source;
-                dependency.ref = package.ref;
-                keepGitSources.insert(cache.source(dependency).lexically_normal());
-                continue;
-            }
-            if (package.sourceType == "archive")
-            {
-                const auto key = package.sha256.empty() ? Hash::xxhash64Hex(package.source) : package.sha256;
-                if (!key.empty())
+                collect();
+                if (!std::filesystem::is_directory(packagesRoot))
                 {
-                    keepArchiveRoots.insert((cache.root() / "_archives" / Path::sanitizePackagePath(package.name) / Path::sanitizePackagePath(key)).lexically_normal());
-                    keptArchivePackages.insert(package.name);
+                    diagnostics.info("source cache gc: no packages directory");
+                    return true;
                 }
-                if (package.sha256.empty() && !package.resolvedArchiveHash.empty())
+                if (!git() || !archives())
                 {
-                    keepArchiveRoots.insert((cache.root() / "_archives" / Path::sanitizePackagePath(package.name) / Path::sanitizePackagePath(package.resolvedArchiveHash)).lexically_normal());
-                    keptArchivePackages.insert(package.name);
+                    return false;
                 }
-            }
-        }
-
-        const auto packagesRoot = Path::stateRoot(workspaceRoot) / "packages";
-        if (!std::filesystem::is_directory(packagesRoot))
-        {
-            diagnostics.info("source cache gc: no packages directory");
-            return true;
-        }
-
-        int deleteCount = 0;
-        auto removeCacheDir = [&](const std::filesystem::path &path, const std::string &description) -> bool
-        {
-            ++deleteCount;
-            diagnostics.info(std::string(apply ? "source cache gc delete " : "source cache gc dry-run ") +
-                             description +
-                             " path=" + path.string());
-            if (!apply)
-            {
+                if (deleteCount == 0)
+                {
+                    diagnostics.info("source cache gc: nothing to delete");
+                }
                 return true;
             }
-            std::error_code ec;
-            std::filesystem::remove_all(path, ec);
-            if (ec)
+
+        private:
+            void collect()
             {
-                diagnostics.error("failed to delete source cache " + path.string() + ": " + ec.message());
-                return false;
+                for (const auto &package : lockFile.packages)
+                {
+                    if (!packageFilter.empty() && package.name != packageFilter)
+                    {
+                        continue;
+                    }
+                    if (package.sourceType == "git")
+                    {
+                        DependencyDesc dependency;
+                        dependency.name = package.name;
+                        dependency.source = package.source;
+                        dependency.ref = package.ref;
+                        keepGitSources.insert(cache.source(dependency).lexically_normal());
+                        continue;
+                    }
+                    if (package.sourceType == "archive")
+                    {
+                        const auto key = package.sha256.empty() ? Hash::xxhash64Hex(package.source) : package.sha256;
+                        if (!key.empty())
+                        {
+                            keepArchiveRoots.insert(
+                                (cache.root() / "_archives" / Path::sanitizePackagePath(package.name) /
+                                 Path::sanitizePackagePath(key))
+                                    .lexically_normal());
+                            keptArchivePackages.insert(package.name);
+                        }
+                        if (package.sha256.empty() && !package.resolvedArchiveHash.empty())
+                        {
+                            keepArchiveRoots.insert(
+                                (cache.root() / "_archives" / Path::sanitizePackagePath(package.name) /
+                                 Path::sanitizePackagePath(package.resolvedArchiveHash))
+                                    .lexically_normal());
+                            keptArchivePackages.insert(package.name);
+                        }
+                    }
+                }
             }
-            return true;
+
+            bool remove(const std::filesystem::path &path, const std::string &description)
+            {
+                ++deleteCount;
+                diagnostics.info(std::string(apply ? "source cache gc delete " : "source cache gc dry-run ") +
+                                 description + " path=" + path.string());
+                if (!apply)
+                {
+                    return true;
+                }
+                std::error_code ec;
+                std::filesystem::remove_all(path, ec);
+                if (ec)
+                {
+                    diagnostics.error("failed to delete source cache " + path.string() + ": " + ec.message());
+                    return false;
+                }
+                return true;
+            }
+
+            bool git()
+            {
+                for (const auto &package : lockFile.packages)
+                {
+                    if (package.sourceType != "git" || (!packageFilter.empty() && package.name != packageFilter))
+                    {
+                        continue;
+                    }
+                    DependencyDesc dependency;
+                    dependency.name = package.name;
+                    dependency.source = package.source;
+                    dependency.ref = package.ref;
+                    const auto sourceRoot = cache.sourceRoot(dependency);
+                    std::error_code ec;
+                    if (!std::filesystem::is_directory(sourceRoot, ec))
+                    {
+                        continue;
+                    }
+                    for (const auto &entry : std::filesystem::directory_iterator(sourceRoot, ec))
+                    {
+                        if (ec)
+                        {
+                            diagnostics.warning("failed to scan package source cache: " + ec.message());
+                            return false;
+                        }
+                        if (!entry.is_directory(ec))
+                        {
+                            continue;
+                        }
+                        const auto path = entry.path().lexically_normal();
+                        if (keepGitSources.find(path) != keepGitSources.end())
+                        {
+                            continue;
+                        }
+                        if (!remove(entry.path(), "package=" + package.name + " reason=not current git ref"))
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            bool archives()
+            {
+                const auto archivesRoot = packagesRoot / "_archives";
+                if (std::filesystem::is_directory(archivesRoot))
+                {
+                    std::error_code ec;
+                    for (const auto &packageDir : std::filesystem::directory_iterator(archivesRoot, ec))
+                    {
+                        if (ec)
+                        {
+                            diagnostics.warning("failed to scan archive source cache: " + ec.message());
+                            return false;
+                        }
+                        if (!packageDir.is_directory(ec))
+                        {
+                            continue;
+                        }
+                        const auto packageName = packageDir.path().filename().string();
+                        if (!packageFilter.empty() && packageFilter != packageName)
+                        {
+                            continue;
+                        }
+                        for (const auto &cacheDir : std::filesystem::directory_iterator(packageDir.path(), ec))
+                        {
+                            if (ec)
+                            {
+                                diagnostics.warning("failed to scan archive package cache: " + ec.message());
+                                return false;
+                            }
+                            if (!cacheDir.is_directory(ec))
+                            {
+                                continue;
+                            }
+                            const auto path = cacheDir.path().lexically_normal();
+                            if (keepArchiveRoots.find(path) != keepArchiveRoots.end())
+                            {
+                                continue;
+                            }
+                            const auto reason = keptArchivePackages.find(packageName) == keptArchivePackages.end()
+                                                    ? " reason=archive package not referenced by lockfile"
+                                                    : " reason=not current archive cache";
+                            if (!remove(cacheDir.path(), "package=" + packageName + reason))
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            const LockFile &lockFile;
+            bool apply;
+            const std::string &packageFilter;
+            DiagnosticSink &diagnostics;
+            PackageCache cache;
+            const std::filesystem::path packagesRoot;
+            std::set<std::filesystem::path> keepGitSources;
+            std::set<std::filesystem::path> keepArchiveRoots;
+            std::set<std::string> keptArchivePackages;
+            int deleteCount = 0;
         };
+    }
 
-        for (const auto &package : lockFile.packages)
-        {
-            if (package.sourceType != "git" || (!packageFilter.empty() && package.name != packageFilter))
-            {
-                continue;
-            }
-            DependencyDesc dependency;
-            dependency.name = package.name;
-            dependency.source = package.source;
-            dependency.ref = package.ref;
-            const auto sourceRoot = cache.sourceRoot(dependency);
-            std::error_code ec;
-            if (!std::filesystem::is_directory(sourceRoot, ec))
-            {
-                continue;
-            }
-            for (const auto &entry : std::filesystem::directory_iterator(sourceRoot, ec))
-            {
-                if (ec)
-                {
-                    diagnostics.warning("failed to scan package source cache: " + ec.message());
-                    return false;
-                }
-                if (!entry.is_directory(ec))
-                {
-                    continue;
-                }
-                const auto path = entry.path().lexically_normal();
-                if (keepGitSources.find(path) != keepGitSources.end())
-                {
-                    continue;
-                }
-                if (!removeCacheDir(entry.path(), "package=" + package.name + " reason=not current git ref"))
-                {
-                    return false;
-                }
-            }
-        }
-
-        const auto archivesRoot = packagesRoot / "_archives";
-        if (std::filesystem::is_directory(archivesRoot))
-        {
-            std::error_code ec;
-            for (const auto &packageDir : std::filesystem::directory_iterator(archivesRoot, ec))
-            {
-                if (ec)
-                {
-                    diagnostics.warning("failed to scan archive source cache: " + ec.message());
-                    return false;
-                }
-                if (!packageDir.is_directory(ec))
-                {
-                    continue;
-                }
-                const auto packageName = packageDir.path().filename().string();
-                if (!packageFilter.empty() && packageFilter != packageName)
-                {
-                    continue;
-                }
-                for (const auto &cacheDir : std::filesystem::directory_iterator(packageDir.path(), ec))
-                {
-                    if (ec)
-                    {
-                        diagnostics.warning("failed to scan archive package cache: " + ec.message());
-                        return false;
-                    }
-                    if (!cacheDir.is_directory(ec))
-                    {
-                        continue;
-                    }
-                    const auto path = cacheDir.path().lexically_normal();
-                    if (keepArchiveRoots.find(path) != keepArchiveRoots.end())
-                    {
-                        continue;
-                    }
-                    const auto reason = keptArchivePackages.find(packageName) == keptArchivePackages.end()
-                                            ? " reason=archive package not referenced by lockfile"
-                                            : " reason=not current archive cache";
-                    if (!removeCacheDir(cacheDir.path(), "package=" + packageName + reason))
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        if (deleteCount == 0)
-        {
-            diagnostics.info("source cache gc: nothing to delete");
-        }
-        return true;
+    bool ArtifactGc::runSourceCaches(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,
+                                     const std::string &packageFilter, DiagnosticSink &diagnostics)
+    {
+        return SourceCacheGc(lockFile, workspaceRoot, apply, packageFilter, diagnostics).run();
     }
 }

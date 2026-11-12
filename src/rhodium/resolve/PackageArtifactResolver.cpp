@@ -15,12 +15,11 @@
 
 namespace rhodium
 {
-    bool PackageArtifactResolver::shouldLoad(const LockedPackage &locked,
-                                             const std::string &config,
-                                             const std::string &toolchainId,
-                                             const DependencyOverrideSet &overrides)
+    bool PackageArtifactResolver::shouldLoad(const LockedPackage &locked, const std::string &config,
+                                             const std::string &toolchainId, const DependencyOverrideSet &overrides)
     {
-        if (BuildConfig::normalize(locked.config) != BuildConfig::normalize(config) || locked.toolchainId != toolchainId)
+        if (BuildConfig::normalize(locked.config) != BuildConfig::normalize(config) ||
+            locked.toolchainId != toolchainId)
         {
             return false;
         }
@@ -33,8 +32,7 @@ namespace rhodium
     }
 
     void PackageArtifactResolver::appendDirs(std::vector<std::filesystem::path> &output,
-                                             const std::filesystem::path &root,
-                                             const std::vector<std::string> &values)
+                                             const std::filesystem::path &root, const std::vector<std::string> &values)
     {
         for (const auto &value : values)
         {
@@ -43,26 +41,23 @@ namespace rhodium
         }
     }
 
-    bool PackageArtifactResolver::load(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics)
-    {
-        return load(lockFile, workspaceRoot, "debug", {}, DependencyOverrideSet{}, diagnostics);
-    }
-
-    bool PackageArtifactResolver::load(const LockFile &lockFile,
-                                       const std::filesystem::path &workspaceRoot,
-                                       const DependencyOverrideSet &overrides,
+    bool PackageArtifactResolver::load(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
                                        DiagnosticSink &diagnostics)
     {
-        return load(lockFile, workspaceRoot, "debug", {}, overrides, diagnostics);
+        return load(lockFile, workspaceRoot, BuildSelection{"debug", {}}, DependencyOverrideSet{}, diagnostics);
     }
 
-    bool PackageArtifactResolver::load(const LockFile &lockFile,
-                                       const std::filesystem::path &workspaceRoot,
-                                       const std::string &config,
-                                       const std::string &toolchainId,
-                                       const DependencyOverrideSet &overrides,
+    bool PackageArtifactResolver::load(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
+                                       const DependencyOverrideSet &overrides, DiagnosticSink &diagnostics)
+    {
+        return load(lockFile, workspaceRoot, BuildSelection{"debug", {}}, overrides, diagnostics);
+    }
+
+    bool PackageArtifactResolver::load(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
+                                       const BuildSelection &selection, const DependencyOverrideSet &overrides,
                                        DiagnosticSink &diagnostics)
     {
+        const auto &[config, toolchainId] = selection;
         packages_.clear();
 
         std::vector<const LockedPackage *> selectedPackages;
@@ -136,8 +131,11 @@ namespace rhodium
         {
             result.push_back(package);
         }
-        std::sort(result.begin(), result.end(), [](const auto &lhs, const auto &rhs)
-                  { return lhs.name < rhs.name; });
+        std::sort(result.begin(), result.end(),
+                  [](const auto &lhs, const auto &rhs)
+                  {
+                      return lhs.name < rhs.name;
+                  });
         return result;
     }
 

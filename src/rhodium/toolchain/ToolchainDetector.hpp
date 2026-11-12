@@ -15,18 +15,25 @@ namespace rhodium
 {
     class DiagnosticSink;
 
-    std::filesystem::path findExecutableOnPath(const std::string &name);
-    std::filesystem::path findToolInDir(const std::filesystem::path &dir, const std::string &baseName);
-    void addWindowsMsvcProfilesFromRoots(std::vector<ToolchainProfile> &profiles,
-                                         const std::filesystem::path &vsRoot,
-                                         const std::filesystem::path &windowsSdkRoot,
-                                         DiagnosticSink &diagnostics);
-    void addAndroidProfilesFromRoots(std::vector<ToolchainProfile> &profiles,
-                                     const std::filesystem::path &sdkRoot,
-                                     const std::filesystem::path &ndkRoot,
-                                     DiagnosticSink &diagnostics);
-    std::vector<ToolchainProfile> detectHostToolchains(DiagnosticSink &diagnostics);
-    std::vector<ToolchainProfile> detectHostToolchains(const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics);
-    bool detectAndWriteHostToolchains(const std::filesystem::path &workspaceRoot, std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    std::filesystem::path hostToolchainCachePath(const std::filesystem::path &workspaceRoot);
+    class ToolchainDetector
+    {
+    public:
+        static void windows(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
+        static void android(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot,
+                            DiagnosticSink &diagnostics);
+        static void unixProfiles(std::vector<ToolchainProfile> &profiles);
+        static std::filesystem::path findExecutable(const std::string &name);
+        static std::filesystem::path findTool(const std::filesystem::path &dir, const std::string &baseName);
+        static void windows(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &vsRoot,
+                            const std::filesystem::path &windowsSdkRoot, DiagnosticSink &diagnostics);
+        static void android(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &sdkRoot,
+                            const std::filesystem::path &ndkRoot, DiagnosticSink &diagnostics);
+        static std::vector<ToolchainProfile> host(DiagnosticSink &diagnostics);
+        static std::vector<ToolchainProfile> host(const std::filesystem::path &workspaceRoot,
+                                                  DiagnosticSink &diagnostics);
+        static bool writeHost(const std::filesystem::path &workspaceRoot, std::vector<ToolchainProfile> &profiles,
+                              DiagnosticSink &diagnostics);
+        static std::filesystem::path cachePath(const std::filesystem::path &workspaceRoot);
+    };
+
 }

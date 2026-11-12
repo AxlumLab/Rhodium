@@ -17,11 +17,8 @@
 namespace rhodium
 {
 
-    bool MakePackageBuilder::run(const std::filesystem::path &workingDir,
-                                 const MakeBuildConfig &make,
-                                 const BuildUtil::Context &context,
-                                 const std::vector<std::string> &extraArgs,
-                                 const std::vector<std::string> &targets,
+    bool MakePackageBuilder::run(const MakeBuildConfig &make, const BuildUtil::Context &context,
+                                 const std::vector<std::string> &extraArgs, const std::vector<std::string> &targets,
                                  DiagnosticSink &diagnostics)
     {
         std::vector<std::string> args;
@@ -34,11 +31,8 @@ namespace rhodium
         auto expandedTargets = BuildUtil::expand(targets, context);
         args.insert(args.end(), expandedTargets.begin(), expandedTargets.end());
 
-        const auto commandArgs = BuildUtil::wrap(
-            workingDir,
-            BuildUtil::expand(make.env, context),
-            make.executable.empty() ? "make" : make.executable,
-            args);
+        const auto commandArgs = BuildUtil::wrap(context.sourceDir, BuildUtil::expand(make.env, context),
+                                                 make.executable.empty() ? "make" : make.executable, args);
         auto result = Process::run(context.cmake.empty() ? "cmake" : context.cmake, commandArgs, context.environment);
         if (!result.output.empty())
         {
@@ -52,18 +46,11 @@ namespace rhodium
         return true;
     }
 
-    bool MakePackageBuilder::build(const DependencyDesc &dependency,
-                                   const std::filesystem::path &sourceDir,
-                                   const std::filesystem::path &buildDir,
-                                   const std::filesystem::path &artifactDir,
-                                   const std::string &commit,
-                                   const std::filesystem::path &workspaceRoot,
-                                   const std::string &preferredToolchain,
-                                   const std::string &config,
-                                   const PackageBuildOptions &options,
-                                   PackageArtifact &artifact,
+    bool MakePackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
                                    DiagnosticSink &diagnostics) const
     {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
         std::string error;
         if (!File::mkdir(buildDir, &error) || !File::mkdir(artifactDir, &error))
         {
@@ -79,7 +66,7 @@ namespace rhodium
         }
         if (options.runBuild)
         {
-            if (!run(sourceDir, dependency.make, context, dependency.make.args, dependency.make.targets, diagnostics))
+            if (!run(dependency.make, context, dependency.make.args, dependency.make.targets, diagnostics))
             {
                 return false;
             }
@@ -94,7 +81,8 @@ namespace rhodium
         }
         if (!dependency.make.installTargets.empty())
         {
-            if (!run(sourceDir, dependency.make, context, dependency.make.installArgs, dependency.make.installTargets, diagnostics))
+            if (!run(dependency.make, context, dependency.make.installArgs, dependency.make.installTargets,
+                     diagnostics))
             {
                 return false;
             }

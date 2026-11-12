@@ -63,13 +63,14 @@ namespace rhodium
         bool complete = false;
         std::vector<std::string> missing;
     };
-    
+
     class Toolchain
     {
     public:
+        static std::string contentHash(const ToolchainProfile &profile, const std::string &config);
+
         virtual ~Toolchain() = default;
         virtual std::string name() const = 0;
     };
-    std::string toolchainContentHash(const ToolchainProfile &profile, const std::string &config);
 
 } // namespace rhodium

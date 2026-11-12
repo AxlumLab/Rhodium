@@ -30,12 +30,9 @@ namespace rhodium
     class AndroidTc
     {
     public:
-        static void addRoots(std::vector<ToolchainProfile> &profiles,
-                             const std::filesystem::path &sdkRoot,
-                             const std::filesystem::path &ndkRoot,
-                             DiagnosticSink &diagnostics);
-        static void add(std::vector<ToolchainProfile> &profiles,
-                        const std::filesystem::path &workspaceRoot,
+        static void addRoots(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &sdkRoot,
+                             const std::filesystem::path &ndkRoot, DiagnosticSink &diagnostics);
+        static void add(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot,
                         DiagnosticSink &diagnostics);
 
     private:
@@ -45,10 +42,8 @@ namespace rhodium
         static std::filesystem::path ndk(const std::filesystem::path &sdkRoot);
         static std::string api(const std::filesystem::path &sdkRoot, const std::filesystem::path &ndkRoot);
         static std::filesystem::path javaHome();
-        static ToolchainProfile profile(const std::filesystem::path &sdkRoot,
-                                        const std::filesystem::path &ndkRoot,
-                                        const std::filesystem::path &prebuilt,
-                                        const AndroidAbi &abi,
+        static ToolchainProfile profile(const std::filesystem::path &sdkRoot, const std::filesystem::path &ndkRoot,
+                                        const std::filesystem::path &prebuilt, const AndroidAbi &abi,
                                         const std::string &api);
     };
 
@@ -101,7 +96,8 @@ namespace rhodium
         const auto userProfile = ToolProbe::env("USERPROFILE");
         if (!userProfile.empty())
         {
-            ToolProbe::appendUnique(candidates, std::filesystem::path(userProfile) / "AppData" / "Local" / "Android" / "Sdk");
+            ToolProbe::appendUnique(candidates,
+                                    std::filesystem::path(userProfile) / "AppData" / "Local" / "Android" / "Sdk");
         }
         ToolProbe::appendUnique(candidates, "C:/Android/Sdk");
         ToolProbe::appendUnique(candidates, "D:/Android/Sdk");
@@ -129,8 +125,9 @@ namespace rhodium
                 continue;
             }
             const bool hasAdb = !ToolProbe::inDir(candidate / "platform-tools", "adb").empty();
-            const bool hasSdkManager = !ToolProbe::inDir(candidate / "cmdline-tools" / "latest" / "bin", "sdkmanager").empty() ||
-                                       !ToolProbe::inDir(candidate / "tools" / "bin", "sdkmanager").empty();
+            const bool hasSdkManager =
+                !ToolProbe::inDir(candidate / "cmdline-tools" / "latest" / "bin", "sdkmanager").empty() ||
+                !ToolProbe::inDir(candidate / "tools" / "bin", "sdkmanager").empty();
             bool hasPlatform = false;
             const auto platforms = candidate / "platforms";
             if (std::filesystem::is_directory(platforms))
@@ -144,7 +141,8 @@ namespace rhodium
                     }
                 }
             }
-            const bool hasNdk = std::filesystem::is_directory(candidate / "ndk") || std::filesystem::is_directory(candidate / "ndk-bundle");
+            const bool hasNdk = std::filesystem::is_directory(candidate / "ndk") ||
+                                std::filesystem::is_directory(candidate / "ndk-bundle");
             if (hasAdb || hasSdkManager || hasPlatform || hasNdk)
             {
                 return candidate;
@@ -186,8 +184,11 @@ namespace rhodium
                         ndkVersions.push_back(entry.path());
                     }
                 }
-                std::sort(ndkVersions.begin(), ndkVersions.end(), [](const auto &lhs, const auto &rhs)
-                          { return ToolProbe::newer(lhs.filename().string(), rhs.filename().string()); });
+                std::sort(ndkVersions.begin(), ndkVersions.end(),
+                          [](const auto &lhs, const auto &rhs)
+                          {
+                              return ToolProbe::newer(lhs.filename().string(), rhs.filename().string());
+                          });
                 for (const auto &version : ndkVersions)
                 {
                     candidates.push_back(version);
@@ -256,7 +257,8 @@ namespace rhodium
         const auto localAppData = ToolProbe::env("LOCALAPPDATA");
         if (!localAppData.empty())
         {
-            ToolProbe::appendUnique(candidates, std::filesystem::path(localAppData) / "Programs" / "Android Studio" / "jbr");
+            ToolProbe::appendUnique(candidates,
+                                    std::filesystem::path(localAppData) / "Programs" / "Android Studio" / "jbr");
         }
         for (const auto &root : {ToolProbe::programFiles() / "Eclipse Adoptium", ToolProbe::programFiles() / "Java"})
         {
@@ -297,10 +299,8 @@ namespace rhodium
         return {};
     }
 
-    ToolchainProfile AndroidTc::profile(const std::filesystem::path &sdkRoot,
-                                        const std::filesystem::path &ndkRoot,
-                                        const std::filesystem::path &prebuilt,
-                                        const AndroidAbi &abi,
+    ToolchainProfile AndroidTc::profile(const std::filesystem::path &sdkRoot, const std::filesystem::path &ndkRoot,
+                                        const std::filesystem::path &prebuilt, const AndroidAbi &abi,
                                         const std::string &api)
     {
         const auto bin = prebuilt / "bin";
@@ -349,10 +349,8 @@ namespace rhodium
         return profile;
     }
 
-    void AndroidTc::addRoots(std::vector<ToolchainProfile> &profiles,
-                                     const std::filesystem::path &sdkRoot,
-                                     const std::filesystem::path &ndkRoot,
-                                     DiagnosticSink &diagnostics)
+    void AndroidTc::addRoots(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &sdkRoot,
+                             const std::filesystem::path &ndkRoot, DiagnosticSink &diagnostics)
     {
         (void)diagnostics;
         const auto prebuilt = ToolProbe::androidPrebuilt(ndkRoot);
@@ -373,24 +371,22 @@ namespace rhodium
         }
     }
 
-    void AndroidTc::add(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics)
+    void AndroidTc::add(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot,
+                        DiagnosticSink &diagnostics)
     {
         const auto sdkRoot = sdk(workspaceRoot);
         const auto ndkRoot = ndk(sdkRoot);
         addRoots(profiles, sdkRoot, ndkRoot, diagnostics);
     }
 
-    void addAndroidProfilesFromRoots(std::vector<ToolchainProfile> &profiles,
-                                     const std::filesystem::path &sdkRoot,
-                                     const std::filesystem::path &ndkRoot,
-                                     DiagnosticSink &diagnostics)
+    void ToolchainDetector::android(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &sdkRoot,
+                                    const std::filesystem::path &ndkRoot, DiagnosticSink &diagnostics)
     {
         AndroidTc::addRoots(profiles, sdkRoot, ndkRoot, diagnostics);
     }
 
-    void addAndroidProfiles(std::vector<ToolchainProfile> &profiles,
-                            const std::filesystem::path &workspaceRoot,
-                            DiagnosticSink &diagnostics)
+    void ToolchainDetector::android(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot,
+                                    DiagnosticSink &diagnostics)
     {
         AndroidTc::add(profiles, workspaceRoot, diagnostics);
     }

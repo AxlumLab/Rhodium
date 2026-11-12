@@ -12,7 +12,7 @@ namespace rhodium
     void JsonDiagnosticSink::report(const Diagnostic &diagnostic)
     {
         diagnostics_.push_back({
-            {"level", toString(diagnostic.level)},
+            {"level", Diagnostic::name(diagnostic.level)},
             {"message", diagnostic.message},
         });
     }

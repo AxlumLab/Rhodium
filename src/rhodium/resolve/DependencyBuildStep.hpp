@@ -38,31 +38,31 @@ namespace rhodium
             bool skipPackage = false;
         };
 
-        static bool run(const DependencyDesc &dependency,
-                        const std::filesystem::path &sourceRoot,
-                        const std::string &commit,
-                        LockedPackage *locked,
-                        bool wantsUpdate,
-                        const Context &context,
-                        Result &result,
-                        DiagnosticSink &diagnostics);
+        struct Request
+        {
+            const DependencyDesc &dependency;
+            std::filesystem::path sourceRoot;
+            std::string commit;
+            LockedPackage *locked;
+            bool wantsUpdate;
+        };
+
+        static bool run(const Request &request, const Context &context, Result &result, DiagnosticSink &diagnostics);
 
         static void applyConfig(DependencyDesc &dependency, const std::string &config);
         static std::string key(const std::string &config, const std::string &toolchainId);
 
     private:
+        static void reportFailure(const DependencyDesc &dependency, const std::filesystem::path &sourceRoot,
+                                  const std::filesystem::path &buildDir, DiagnosticSink &diagnostics);
         static std::unique_ptr<PackageBuilder> builder(const DependencyDesc &dependency);
         static std::filesystem::path subdir(const std::filesystem::path &source, const DependencyDesc &dependency);
-        static std::set<std::string> retained(const LockFile &lockFile,
-                                              const std::string &packageName,
+        static std::set<std::string> retained(const LockFile &lockFile, const std::string &packageName,
                                               const std::string &currentPkgKey);
-        static void removeSiblings(const PackageCache &cache,
-                                   const DependencyDesc &dependency,
-                                   const std::string &currentPkgKey,
-                                   const std::set<std::string> &keepKeys,
+        static void removeSiblings(const PackageCache &cache, const DependencyDesc &dependency,
+                                   const std::string &currentPkgKey, const std::set<std::string> &keepKeys,
                                    DiagnosticSink &diagnostics);
-        static bool removeBeforeRebuild(const std::filesystem::path &buildDir,
-                                        DiagnosticSink &diagnostics);
+        static bool removeBeforeRebuild(const std::filesystem::path &buildDir, DiagnosticSink &diagnostics);
         static std::string normalized(const std::filesystem::path &path);
         static bool hasCMakeCache(const std::filesystem::path &buildDir);
         static bool cacheMatchesDir(const std::filesystem::path &buildDir);

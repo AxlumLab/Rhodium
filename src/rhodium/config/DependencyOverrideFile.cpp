@@ -20,12 +20,10 @@ namespace rhodium
     class OverrideData final
     {
     public:
-        static bool add(DependencyOverrideSet &set,
-                        const std::string &name,
-                        const std::string &rawPath,
-                        const std::filesystem::path &base,
-                        const std::string &source,
-                        DiagnosticSink &diagnostics)
+        OverrideData(DependencyOverrideSet &set, DiagnosticSink &diagnostics) : set(set), diagnostics(diagnostics) {}
+
+        bool add(const std::string &name, const std::string &rawPath, const std::filesystem::path &base,
+                 const std::string &source)
         {
             if (name.empty())
             {
@@ -58,7 +56,8 @@ namespace rhodium
             return true;
         }
 
-        static bool parseCli(const std::string &value, std::string &name, std::string &path, DiagnosticSink &diagnostics)
+        static bool parseCli(const std::string &value, std::string &name, std::string &path,
+                             DiagnosticSink &diagnostics)
         {
             const auto equals = value.find('=');
             if (equals == std::string::npos || equals == 0 || equals + 1 >= value.size())
@@ -72,6 +71,9 @@ namespace rhodium
         }
 
     private:
+        DependencyOverrideSet &set;
+        DiagnosticSink &diagnostics;
+
         static std::filesystem::path normalize(const std::filesystem::path &path)
         {
             std::error_code ec;
@@ -90,7 +92,8 @@ namespace rhodium
         return Path::stateRoot(workspaceRoot) / "overrides.toml";
     }
 
-    bool DependencyOverrides::read(const std::filesystem::path &workspaceRoot, LocalDependencyOverrides &overrides, DiagnosticSink &diagnostics)
+    bool DependencyOverrides::read(const std::filesystem::path &workspaceRoot, LocalDependencyOverrides &overrides,
+                                   DiagnosticSink &diagnostics)
     {
         overrides.paths.clear();
         const auto file = path(workspaceRoot);
@@ -126,7 +129,8 @@ namespace rhodium
         }
     }
 
-    bool DependencyOverrides::write(const std::filesystem::path &workspaceRoot, const LocalDependencyOverrides &overrides, DiagnosticSink &diagnostics)
+    bool DependencyOverrides::write(const std::filesystem::path &workspaceRoot,
+                                    const LocalDependencyOverrides &overrides, DiagnosticSink &diagnostics)
     {
         std::ostringstream stream;
         stream << "[overrides]\n";
@@ -149,16 +153,15 @@ namespace rhodium
         return true;
     }
 
-    bool DependencyOverrides::make(const BuildModel &model,
-                                   const std::filesystem::path &workspaceRoot,
-                                   const std::vector<std::string> &cliOverrides,
-                                   DependencyOverrideSet &overrides,
+    bool DependencyOverrides::make(const BuildModel &model, const std::filesystem::path &workspaceRoot,
+                                   const std::vector<std::string> &cliOverrides, DependencyOverrideSet &overrides,
                                    DiagnosticSink &diagnostics)
     {
         overrides.overrides.clear();
+        OverrideData entries(overrides, diagnostics);
         for (const auto &override : model.rootPackage.dependencyOverrides)
         {
-            if (!OverrideData::add(overrides, override.name, override.path, workspaceRoot, "dsl", diagnostics))
+            if (!entries.add(override.name, override.path, workspaceRoot, "dsl"))
             {
                 return false;
             }
@@ -171,7 +174,7 @@ namespace rhodium
         }
         for (const auto &[name, path] : local.paths)
         {
-            if (!OverrideData::add(overrides, name, path, workspaceRoot, "local", diagnostics))
+            if (!entries.add(name, path, workspaceRoot, "local"))
             {
                 return false;
             }
@@ -185,7 +188,7 @@ namespace rhodium
             {
                 return false;
             }
-            if (!OverrideData::add(overrides, name, path, std::filesystem::current_path(), "cli", diagnostics))
+            if (!entries.add(name, path, std::filesystem::current_path(), "cli"))
             {
                 return false;
             }

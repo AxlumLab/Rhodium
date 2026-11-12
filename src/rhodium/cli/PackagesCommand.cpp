@@ -23,41 +23,135 @@ namespace rhodium
         void report(const Diagnostic &) override {}
     };
 
-    std::string packageStatus(const std::filesystem::path &artifactPath)
+    namespace
     {
-        if (!File::dir(artifactPath))
+        class PackageStatus final
         {
-            return "missing";
-        }
-        if (!File::exists(artifactPath / "artifact.toml"))
-        {
-            return "invalid";
-        }
+        public:
+            static std::string read(const std::filesystem::path &artifactPath)
+            {
+                if (!File::dir(artifactPath))
+                {
+                    return "missing";
+                }
+                if (!File::exists(artifactPath / "artifact.toml"))
+                {
+                    return "invalid";
+                }
 
-        DependencyArtifacts artifacts;
-        NullDiagnosticSink diagnostics;
-        if (!ArtifactStore::read(artifactPath / "artifact.toml", artifacts, diagnostics))
-        {
-            return "invalid";
-        }
+                DependencyArtifacts artifacts;
+                NullDiagnosticSink diagnostics;
+                if (!ArtifactStore::read(artifactPath / "artifact.toml", artifacts, diagnostics))
+                {
+                    return "invalid";
+                }
 
-        BuildUtil::Context context;
-        context.artifactDir = artifactPath;
-        return BuildUtil::validate(context, artifacts, diagnostics) ? "built" : "invalid";
+                BuildUtil::Context context;
+                context.artifactDir = artifactPath;
+                return BuildUtil::validate(context, artifacts, diagnostics) ? "built" : "invalid";
+            }
+
+            static bool visible(const LockedPackage &package, const DependencyOverrideSet &overrides)
+            {
+                const auto overrideIt = overrides.overrides.find(package.name);
+                if (overrideIt == overrides.overrides.end())
+                {
+                    return !package.overridden;
+                }
+                return package.overridden && package.overridePath == overrideIt->second.path.string();
+            }
+        };
     }
 
-    bool shouldShowLockedPackageForOverrides(const LockedPackage &package, const DependencyOverrideSet &overrides)
+    namespace
     {
-        const auto overrideIt = overrides.overrides.find(package.name);
-        if (overrideIt == overrides.overrides.end())
+        class PackageRow final
         {
-            return !package.overridden;
-        }
-        return package.overridden && package.overridePath == overrideIt->second.path.string();
+        public:
+            static std::filesystem::path sourcePath(const LockedPackage &package,
+                                                    const std::filesystem::path &workspaceRoot)
+            {
+                auto cachePath = std::filesystem::path{};
+                if (package.sourceType == "local")
+                {
+                    cachePath = std::filesystem::path(package.source);
+                }
+                else
+                {
+                    DependencyDesc dependency;
+                    dependency.name = package.name;
+                    dependency.source = package.source;
+                    dependency.ref = package.ref;
+                    PackageCache cache(Path::stateRoot(workspaceRoot) / "packages");
+                    cachePath = cache.source(dependency);
+                }
+                if (package.sourceType == "local" && cachePath.is_relative())
+                {
+                    cachePath = workspaceRoot / cachePath;
+                }
+                if (package.sourceType == "archive")
+                {
+                    const auto key = package.sha256.empty() ? package.resolvedArchiveHash : package.sha256;
+                    cachePath = Path::stateRoot(workspaceRoot) / "packages" / "_archives" /
+                                Path::sanitizePackagePath(package.name) / Path::sanitizePackagePath(key) / "src";
+                }
+
+                return cachePath;
+            }
+
+            static void details(const LockedPackage &package, const std::filesystem::path &cachePath,
+                                const std::string &status)
+            {
+                LogInfo("  artifact_id={}", package.artifactId.empty() ? "-" : package.artifactId);
+                LogInfo("  build_hash={}", package.buildHash.empty() ? "-" : package.buildHash);
+                LogInfo("  source_type={}", package.sourceType.empty() ? "-" : package.sourceType);
+                LogInfo("  overridden={}", package.overridden ? "yes" : "no");
+                if (package.overridden)
+                {
+                    LogInfo("  override_path={}", package.overridePath.empty() ? "-" : package.overridePath);
+                    LogInfo("  override_source={}", package.overrideSource.empty() ? "-" : package.overrideSource);
+                    LogInfo("  original_source={}", package.originalSource.empty() ? "-" : package.originalSource);
+                    LogInfo("  original_source_type={}",
+                            package.originalSourceType.empty() ? "-" : package.originalSourceType);
+                    LogInfo("  original_ref={}", package.originalRef.empty() ? "-" : package.originalRef);
+                }
+                if (package.sourceType == "archive")
+                {
+                    LogInfo("  sha256={}", package.sha256.empty() ? "-" : package.sha256);
+                    LogInfo("  resolved_archive_hash={}",
+                            package.resolvedArchiveHash.empty() ? "-" : package.resolvedArchiveHash);
+                    LogInfo("  strip_components={}", package.stripComponents);
+                    LogInfo("  patches={}", package.patches.size());
+                    for (std::size_t i = 0; i < package.patchHashes.size(); ++i)
+                    {
+                        LogInfo("  patch_hash[{}]={}", i, package.patchHashes[i]);
+                    }
+                    LogInfo("  source_dir={}", cachePath.string());
+                }
+                LogInfo("  toolchain_sensitive={}", package.buildHash.empty() ? "unknown" : "yes");
+                LogInfo("  up_to_date_reason={}", status == "built"
+                                                      ? "artifact metadata and exported files are valid"
+                                                      : "artifact metadata or exported files are missing/invalid");
+            }
+
+            static void print(const LockedPackage &package, const std::filesystem::path &workspaceRoot, bool verbose)
+            {
+                const auto cachePath = sourcePath(package, workspaceRoot);
+                const auto artifactPath = Path::stateRoot(workspaceRoot) / "artifacts" / package.artifactId;
+                const auto status = PackageStatus::read(artifactPath);
+                LogInfo("{} source={} ref={} commit={} build={} cache={} artifact={} status={}", package.name,
+                        package.source, package.ref.empty() ? "-" : package.ref,
+                        package.commit.empty() ? "-" : package.commit, package.buildType, cachePath.string(),
+                        artifactPath.string(), status);
+                if (verbose)
+                {
+                    details(package, cachePath, status);
+                }
+            }
+        };
     }
 
-    int Commands::packages(const std::filesystem::path &workspaceRoot,
-                           bool verbose,
+    int Commands::packages(const std::filesystem::path &workspaceRoot, bool verbose,
                            const std::vector<std::string> &cliOverrides)
     {
         ConsoleDiagnosticSink diagnostics;
@@ -67,7 +161,7 @@ namespace rhodium
             return 1;
         }
         DependencyOverrideSet overrides;
-        if (!loadEffectiveDependencyOverrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
+        if (!CliWorkspace::overrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
         {
             return 1;
         }
@@ -85,73 +179,12 @@ namespace rhodium
         bool printed = false;
         for (const auto &package : lockFile.packages)
         {
-            if (!shouldShowLockedPackageForOverrides(package, overrides))
+            if (!PackageStatus::visible(package, overrides))
             {
                 continue;
             }
             printed = true;
-            auto cachePath = std::filesystem::path{};
-            if (package.sourceType == "local")
-            {
-                cachePath = std::filesystem::path(package.source);
-            }
-            else
-            {
-                DependencyDesc dependency;
-                dependency.name = package.name;
-                dependency.source = package.source;
-                dependency.ref = package.ref;
-                PackageCache cache(Path::stateRoot(workspaceRoot) / "packages");
-                cachePath = cache.source(dependency);
-            }
-            if (package.sourceType == "local" && cachePath.is_relative())
-            {
-                cachePath = workspaceRoot / cachePath;
-            }
-            if (package.sourceType == "archive")
-            {
-                const auto key = package.sha256.empty() ? package.resolvedArchiveHash : package.sha256;
-                cachePath = Path::stateRoot(workspaceRoot) / "packages" / "_archives" / Path::sanitizePackagePath(package.name) / Path::sanitizePackagePath(key) / "src";
-            }
-            const auto artifactPath = Path::stateRoot(workspaceRoot) / "artifacts" / package.artifactId;
-            const auto status = packageStatus(artifactPath);
-            LogInfo("{} source={} ref={} commit={} build={} cache={} artifact={} status={}", package.name,
-                    package.source,
-                    package.ref.empty() ? "-" : package.ref,
-                    package.commit.empty() ? "-" : package.commit,
-                    package.buildType,
-                    cachePath.string(),
-                    artifactPath.string(),
-                    status);
-            if (verbose)
-            {
-                LogInfo("  artifact_id={}", package.artifactId.empty() ? "-" : package.artifactId);
-                LogInfo("  build_hash={}", package.buildHash.empty() ? "-" : package.buildHash);
-                LogInfo("  source_type={}", package.sourceType.empty() ? "-" : package.sourceType);
-                LogInfo("  overridden={}", package.overridden ? "yes" : "no");
-                if (package.overridden)
-                {
-                    LogInfo("  override_path={}", package.overridePath.empty() ? "-" : package.overridePath);
-                    LogInfo("  override_source={}", package.overrideSource.empty() ? "-" : package.overrideSource);
-                    LogInfo("  original_source={}", package.originalSource.empty() ? "-" : package.originalSource);
-                    LogInfo("  original_source_type={}", package.originalSourceType.empty() ? "-" : package.originalSourceType);
-                    LogInfo("  original_ref={}", package.originalRef.empty() ? "-" : package.originalRef);
-                }
-                if (package.sourceType == "archive")
-                {
-                    LogInfo("  sha256={}", package.sha256.empty() ? "-" : package.sha256);
-                    LogInfo("  resolved_archive_hash={}", package.resolvedArchiveHash.empty() ? "-" : package.resolvedArchiveHash);
-                    LogInfo("  strip_components={}", package.stripComponents);
-                    LogInfo("  patches={}", package.patches.size());
-                    for (std::size_t i = 0; i < package.patchHashes.size(); ++i)
-                    {
-                        LogInfo("  patch_hash[{}]={}", i, package.patchHashes[i]);
-                    }
-                    LogInfo("  source_dir={}", cachePath.string());
-                }
-                LogInfo("  toolchain_sensitive={}", package.buildHash.empty() ? "unknown" : "yes");
-                LogInfo("  up_to_date_reason={}", status == "built" ? "artifact metadata and exported files are valid" : "artifact metadata or exported files are missing/invalid");
-            }
+            PackageRow::print(package, workspaceRoot, verbose);
         }
         if (!printed)
         {
@@ -160,14 +193,9 @@ namespace rhodium
         return 0;
     }
 
-    int Commands::packagesGc(const std::filesystem::path &workspaceRoot,
-                             bool apply,
-                             const std::string &packageFilter,
-                             bool builds,
-                             bool sources,
-                             const std::string &preferredToolchain,
-                             const std::string &configOption)
+    int Commands::packagesGc(const std::filesystem::path &workspaceRoot, const PackageGcOptions &request)
     {
+        const auto &[apply, packageFilter, builds, sources, preferredToolchain, configOption] = request;
         ConsoleDiagnosticSink diagnostics;
         LockFile lockFile;
         if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
@@ -189,17 +217,22 @@ namespace rhodium
             {
                 return 1;
             }
-            const auto config = resolveCommandConfigWithState(model, workspaceRoot, configOption, diagnostics);
+            const auto config = CliWorkspace::config(model, configOption, diagnostics);
             if (config.empty())
             {
                 return 1;
             }
-            const auto effectiveToolchain = preferredToolchainForCommand(workspaceRoot, preferredToolchain, diagnostics);
+            const auto effectiveToolchain = CliWorkspace::toolchain(workspaceRoot, preferredToolchain, diagnostics);
             if (effectiveToolchain.empty())
             {
                 return 1;
             }
-            if (!ArtifactGc::runBuildCaches(lockFile, workspaceRoot, config, effectiveToolchain, apply, packageFilter, diagnostics))
+            if (!ArtifactGc::runBuildCaches(lockFile, workspaceRoot,
+                                            BuildCacheGcOptions{.config = config,
+                                                                .toolchainId = effectiveToolchain,
+                                                                .apply = apply,
+                                                                .packageFilter = packageFilter},
+                                            diagnostics))
             {
                 return 1;
             }

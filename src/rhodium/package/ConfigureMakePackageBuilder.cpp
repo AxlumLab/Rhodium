@@ -18,18 +18,11 @@
 namespace rhodium
 {
 
-    bool ConfigureMakePackageBuilder::build(const DependencyDesc &dependency,
-                                            const std::filesystem::path &sourceDir,
-                                            const std::filesystem::path &buildDir,
-                                            const std::filesystem::path &artifactDir,
-                                            const std::string &commit,
-                                            const std::filesystem::path &workspaceRoot,
-                                            const std::string &preferredToolchain,
-                                            const std::string &config,
-                                            const PackageBuildOptions &options,
-                                            PackageArtifact &artifact,
+    bool ConfigureMakePackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
                                             DiagnosticSink &diagnostics) const
     {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
         std::string error;
         if (!File::mkdir(buildDir, &error) || !File::mkdir(artifactDir, &error))
         {
@@ -51,12 +44,11 @@ namespace rhodium
                 rawConfigureArgs.push_back("--prefix=$(artifact)");
             }
             std::vector<std::string> configureArgs = BuildUtil::expand(rawConfigureArgs, context);
-            const auto commandArgs = BuildUtil::wrap(
-                sourceDir,
-                BuildUtil::expand(dependency.configure.env, context),
-                BuildUtil::expand(dependency.configure.script, context),
-                configureArgs);
-            auto result = Process::run(context.cmake.empty() ? "cmake" : context.cmake, commandArgs, context.environment);
+            const auto commandArgs =
+                BuildUtil::wrap(sourceDir, BuildUtil::expand(dependency.configure.env, context),
+                                BuildUtil::expand(dependency.configure.script, context), configureArgs);
+            auto result =
+                Process::run(context.cmake.empty() ? "cmake" : context.cmake, commandArgs, context.environment);
             if (!result.output.empty())
             {
                 diagnostics.info(result.output);
@@ -74,7 +66,16 @@ namespace rhodium
         {
             makeDependency.make.installTargets.push_back("install");
         }
-        return make.build(makeDependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config, options, artifact, diagnostics);
+        return make.build(PackageBuildRequest{.dependency = makeDependency,
+                                              .sourceDir = sourceDir,
+                                              .buildDir = buildDir,
+                                              .artifactDir = artifactDir,
+                                              .commit = commit,
+                                              .workspaceRoot = workspaceRoot,
+                                              .preferredToolchain = preferredToolchain,
+                                              .config = config,
+                                              .options = options},
+                          artifact, diagnostics);
     }
 
 } // namespace rhodium

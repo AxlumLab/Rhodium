@@ -17,10 +17,8 @@
 namespace rhodium
 {
 
-    bool CMakePackageBuilder::run(const std::string &cmake,
-                                  const std::vector<std::string> &args,
-                                  const std::map<std::string, std::string> &environment,
-                                  DiagnosticSink &diagnostics)
+    bool CMakePackageBuilder::run(const std::string &cmake, const std::vector<std::string> &args,
+                                  const std::map<std::string, std::string> &environment, DiagnosticSink &diagnostics)
     {
         auto result = Process::run(cmake.empty() ? "cmake" : cmake, args, environment);
         if (!result.output.empty())
@@ -35,49 +33,16 @@ namespace rhodium
         return true;
     }
 
-    bool CMakePackageBuilder::build(const DependencyDesc &dependency,
-                                    const std::filesystem::path &sourceDir,
-                                    const std::filesystem::path &buildDir,
-                                    const std::filesystem::path &artifactDir,
-                                    const std::string &commit,
-                                    const std::filesystem::path &workspaceRoot,
-                                    const std::string &preferredToolchain,
-                                    const std::string &config,
-                                    const PackageBuildOptions &options,
-                                    PackageArtifact &artifact,
-                                    DiagnosticSink &diagnostics) const
+    class CMakePackageBuilder::Stages final
     {
-        std::string error;
-        if (!File::mkdir(buildDir, &error) || !File::mkdir(artifactDir, &error))
+    public:
+        static std::vector<std::string> buildArgs(const PackageBuildRequest &request, const BuildUtil::Context &context,
+                                                  const std::string &target)
         {
-            diagnostics.error("failed to create package build/artifact directories: " + error);
-            return false;
-        }
+            const auto &dependency = request.dependency;
+            const auto &buildDir = request.buildDir;
+            const auto &cmakeBuildType = context.config;
 
-        const auto cmakeBuildType = dependency.cmake.buildType.empty() ? (config == "release" ? "Release" : "Debug") : dependency.cmake.buildType;
-        BuildUtil::Context context{
-            sourceDir,
-            buildDir,
-            artifactDir,
-            dependency.name,
-            cmakeBuildType,
-            {},
-            {},
-        };
-        context.workspaceRoot = workspaceRoot;
-        if (!BuildUtil::toolchain(context, preferredToolchain, dependency.toolchainRequirements, &diagnostics))
-        {
-            return false;
-        }
-
-        const auto env = BuildUtil::expand(dependency.cmake.env, context);
-        const auto configureArgs = BuildUtil::wrap(
-            sourceDir,
-            env,
-            "cmake",
-            BuildUtil::cmakeArgs(dependency, context));
-
-        auto makeBuildArgs = [&](const std::string &target) {
             std::vector<std::string> args = {"--build", buildDir.string()};
             if (!target.empty())
             {
@@ -95,11 +60,14 @@ namespace rhodium
                 args.insert(args.end(), extra.begin(), extra.end());
             }
             return args;
-        };
+        }
 
-        if (options.runBuild)
+        static bool build(const PackageBuildRequest &request, const BuildUtil::Context &context,
+                          const std::vector<std::string> &configureArgs, DiagnosticSink &diagnostics)
         {
-            if (!run(context.cmake, configureArgs, context.environment, diagnostics))
+            const auto &dependency = request.dependency;
+
+            if (!CMakePackageBuilder::run(context.cmake, configureArgs, context.environment, diagnostics))
             {
                 return false;
             }
@@ -109,10 +77,12 @@ namespace rhodium
                 {
                     if (target.empty())
                     {
-                        diagnostics.error("cmake build_targets contains an empty target for package: " + dependency.name);
+                        diagnostics.error("cmake build_targets contains an empty target for package: " +
+                                          dependency.name);
                         return false;
                     }
-                    if (!run(context.cmake, makeBuildArgs(target), context.environment, diagnostics))
+                    if (!CMakePackageBuilder::run(context.cmake, Stages::buildArgs(request, context, target),
+                                                  context.environment, diagnostics))
                     {
                         return false;
                     }
@@ -123,7 +93,8 @@ namespace rhodium
                 const auto buildTarget = !dependency.cmake.installTarget.empty() && !dependency.cmake.install
                                              ? dependency.cmake.installTarget
                                              : std::string{};
-                if (!run(context.cmake, makeBuildArgs(buildTarget), context.environment, diagnostics))
+                if (!CMakePackageBuilder::run(context.cmake, Stages::buildArgs(request, context, buildTarget),
+                                              context.environment, diagnostics))
                 {
                     return false;
                 }
@@ -132,6 +103,86 @@ namespace rhodium
             {
                 return false;
             }
+
+            return true;
+        }
+
+        static bool install(const PackageBuildRequest &request, const BuildUtil::Context &context,
+                            DiagnosticSink &diagnostics)
+        {
+            const auto &dependency = request.dependency;
+            const auto &buildDir = request.buildDir;
+            const auto &artifactDir = request.artifactDir;
+            const auto &cmakeBuildType = context.config;
+            if (dependency.cmake.install)
+            {
+                if (!dependency.cmake.installTarget.empty())
+                {
+                    std::vector<std::string> installTargetArgs = {"--build", buildDir.string(), "--target",
+                                                                  dependency.cmake.installTarget};
+                    if (!cmakeBuildType.empty())
+                    {
+                        installTargetArgs.push_back("--config");
+                        installTargetArgs.push_back(cmakeBuildType);
+                    }
+                    auto extra = BuildUtil::expand(dependency.cmake.installArgs, context);
+                    installTargetArgs.insert(installTargetArgs.end(), extra.begin(), extra.end());
+                    if (!CMakePackageBuilder::run(context.cmake, installTargetArgs, context.environment, diagnostics))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    std::vector<std::string> installArgs = {"--install", buildDir.string(), "--prefix",
+                                                            artifactDir.string()};
+                    if (!cmakeBuildType.empty())
+                    {
+                        installArgs.push_back("--config");
+                        installArgs.push_back(cmakeBuildType);
+                    }
+                    auto extra = BuildUtil::expand(dependency.cmake.installArgs, context);
+                    installArgs.insert(installArgs.end(), extra.begin(), extra.end());
+                    if (!CMakePackageBuilder::run(context.cmake, installArgs, context.environment, diagnostics))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+    };
+
+    bool CMakePackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
+                                    DiagnosticSink &diagnostics) const
+    {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
+        std::string error;
+        if (!File::mkdir(buildDir, &error) || !File::mkdir(artifactDir, &error))
+        {
+            diagnostics.error("failed to create package build/artifact directories: " + error);
+            return false;
+        }
+
+        const auto cmakeBuildType = dependency.cmake.buildType.empty() ? (config == "release" ? "Release" : "Debug")
+                                                                       : dependency.cmake.buildType;
+        BuildUtil::Context context{
+            sourceDir, buildDir, artifactDir, dependency.name, cmakeBuildType, {}, {},
+        };
+        context.workspaceRoot = workspaceRoot;
+        if (!BuildUtil::toolchain(context, preferredToolchain, dependency.toolchainRequirements, &diagnostics))
+        {
+            return false;
+        }
+
+        const auto env = BuildUtil::expand(dependency.cmake.env, context);
+        const auto configureArgs = BuildUtil::wrap(sourceDir, env, "cmake", BuildUtil::cmakeArgs(dependency, context));
+
+        if (options.runBuild && !Stages::build(request, context, configureArgs, diagnostics))
+        {
+            return false;
         }
 
         if (!options.runExport)
@@ -140,38 +191,9 @@ namespace rhodium
             return true;
         }
 
-        if (dependency.cmake.install)
+        if (!Stages::install(request, context, diagnostics))
         {
-            if (!dependency.cmake.installTarget.empty())
-            {
-                std::vector<std::string> installTargetArgs = {"--build", buildDir.string(), "--target", dependency.cmake.installTarget};
-                if (!cmakeBuildType.empty())
-                {
-                    installTargetArgs.push_back("--config");
-                    installTargetArgs.push_back(cmakeBuildType);
-                }
-                auto extra = BuildUtil::expand(dependency.cmake.installArgs, context);
-                installTargetArgs.insert(installTargetArgs.end(), extra.begin(), extra.end());
-                if (!run(context.cmake, installTargetArgs, context.environment, diagnostics))
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                std::vector<std::string> installArgs = {"--install", buildDir.string(), "--prefix", artifactDir.string()};
-                if (!cmakeBuildType.empty())
-                {
-                    installArgs.push_back("--config");
-                    installArgs.push_back(cmakeBuildType);
-                }
-                auto extra = BuildUtil::expand(dependency.cmake.installArgs, context);
-                installArgs.insert(installArgs.end(), extra.begin(), extra.end());
-                if (!run(context.cmake, installArgs, context.environment, diagnostics))
-                {
-                    return false;
-                }
-            }
+            return false;
         }
         artifact.name = dependency.name;
         artifact.commit = commit;

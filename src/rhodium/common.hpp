@@ -97,31 +97,31 @@ namespace rhodium::type
 
     constexpr i32 kInvalidIndex = -1;
 
-    template <typename T, u32 count>
-    constexpr u32 lengthOf(const T (&)[count])
+    class TypeTraits
     {
-        return count;
-    }
+    public:
+        template <typename T, u32 count> static constexpr u32 lengthOf(const T (&)[count])
+        {
+            return count;
+        }
 
-    template <typename T>
-    constexpr T enumAddFlags(T value, T flags)
-    {
-        return (T)((__underlying_type(T))value | (__underlying_type(T))flags);
-    }
+        template <typename T> static constexpr T enumAddFlags(T value, T flags)
+        {
+            return (T)((__underlying_type(T))value | (__underlying_type(T))flags);
+        }
 
-    // Returns true if given enum value has one or more enum flags set
-    template <typename T>
-    constexpr bool enumHasAnyFlags(T value, T flags)
-    {
-        return ((__underlying_type(T))value & (__underlying_type(T))flags) != 0;
-    }
+        // Returns true if given enum value has one or more enum flags set
+        template <typename T> static constexpr bool enumHasAnyFlags(T value, T flags)
+        {
+            return ((__underlying_type(T))value & (__underlying_type(T))flags) != 0;
+        }
 
-    // Returns true if given enum value has all of the enum flags set
-    template <typename T>
-    constexpr bool enumHasAllFlags(T value, T flags)
-    {
-        return ((__underlying_type(T))value & (__underlying_type(T))flags) == (__underlying_type(T))flags;
-    }
+        // Returns true if given enum value has all of the enum flags set
+        template <typename T> static constexpr bool enumHasAllFlags(T value, T flags)
+        {
+            return ((__underlying_type(T))value & (__underlying_type(T))flags) == (__underlying_type(T))flags;
+        }
+    };
 
     enum class BucketState : byte
     {
@@ -149,6 +149,7 @@ namespace rhodium::type
     {
         return x * (1024 * 1024 * 1024);
     }
+
     inline constexpr u64 operator""_u64(unsigned long long arg) noexcept
     {
         return u64(arg);

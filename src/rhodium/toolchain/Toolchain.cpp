@@ -15,7 +15,7 @@
 
 namespace rhodium
 {
-    std::string toolchainContentHash(const ToolchainProfile &profile, const std::string &config)
+    std::string Toolchain::contentHash(const ToolchainProfile &profile, const std::string &config)
     {
         std::ostringstream stream;
         ToolchainSerializer::appendString(stream, "config", BuildConfig::normalize(config));

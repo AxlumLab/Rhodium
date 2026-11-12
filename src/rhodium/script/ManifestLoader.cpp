@@ -21,10 +21,7 @@ namespace rhodium
     class CountingDiagnosticSink final : public DiagnosticSink
     {
     public:
-        explicit CountingDiagnosticSink(DiagnosticSink &inner)
-            : m_inner(inner)
-        {
-        }
+        explicit CountingDiagnosticSink(DiagnosticSink &inner) : m_inner(inner) {}
 
         void report(const Diagnostic &diagnostic) override
         {
@@ -63,7 +60,10 @@ namespace rhodium
             const auto platform = result.model.workspace.defaultPlatform.empty()
                                       ? Environment::hostPlatformName()
                                       : result.model.workspace.defaultPlatform;
-            bindDsl(lua, result.model, countedDiagnostics, platform, manifestPath.parent_path(), manifestPath);
+            LuaBindings::bind(lua, result.model, countedDiagnostics,
+                              LuaBindingOptions{.activePlatform = platform,
+                                                .workspaceRoot = manifestPath.parent_path(),
+                                                .manifestPath = manifestPath});
 
             sol::protected_function_result execResult = lua.script_file(manifestPath.string());
             if (!execResult.valid())
@@ -73,7 +73,7 @@ namespace rhodium
                 return result;
             }
 
-            if (!validateBuildModel(result.model, countedDiagnostics) || countedDiagnostics.errorCount() > 0)
+            if (!ModelValidator::validate(result.model, countedDiagnostics) || countedDiagnostics.errorCount() > 0)
             {
                 return result;
             }

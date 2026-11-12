@@ -27,58 +27,65 @@ namespace rhodium
         0x19a4c116u, 0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
         0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u};
 
-    u32 _rotr(u32 value, int bits)
+    namespace
     {
-        return (value >> bits) | (value << (32 - bits));
+        class Sha256Block final
+        {
+        public:
+            static u32 rotate(u32 value, int bits)
+            {
+                return (value >> bits) | (value << (32 - bits));
+            }
+
+            static void transform(std::array<u32, 8> &state, const u8 *chunk)
+            {
+                std::array<u32, 64> w{};
+                for (int i = 0; i < 16; ++i)
+                {
+                    w[i] = (static_cast<u32>(chunk[i * 4]) << 24) | (static_cast<u32>(chunk[i * 4 + 1]) << 16) |
+                           (static_cast<u32>(chunk[i * 4 + 2]) << 8) | static_cast<u32>(chunk[i * 4 + 3]);
+                }
+                for (int i = 16; i < 64; ++i)
+                {
+                    const auto s0 =
+                        Sha256Block::rotate(w[i - 15], 7) ^ Sha256Block::rotate(w[i - 15], 18) ^ (w[i - 15] >> 3);
+                    const auto s1 =
+                        Sha256Block::rotate(w[i - 2], 17) ^ Sha256Block::rotate(w[i - 2], 19) ^ (w[i - 2] >> 10);
+                    w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+                }
+
+                auto a = state[0], b = state[1], c = state[2], d = state[3];
+                auto e = state[4], f = state[5], g = state[6], h = state[7];
+                for (int i = 0; i < 64; ++i)
+                {
+                    const auto s1 = Sha256Block::rotate(e, 6) ^ Sha256Block::rotate(e, 11) ^ Sha256Block::rotate(e, 25);
+                    const auto ch = (e & f) ^ ((~e) & g);
+                    const auto temp1 = h + s1 + ch + k[i] + w[i];
+                    const auto s0 = Sha256Block::rotate(a, 2) ^ Sha256Block::rotate(a, 13) ^ Sha256Block::rotate(a, 22);
+                    const auto maj = (a & b) ^ (a & c) ^ (b & c);
+                    const auto temp2 = s0 + maj;
+                    h = g;
+                    g = f;
+                    f = e;
+                    e = d + temp1;
+                    d = c;
+                    c = b;
+                    b = a;
+                    a = temp1 + temp2;
+                }
+                state[0] += a;
+                state[1] += b;
+                state[2] += c;
+                state[3] += d;
+                state[4] += e;
+                state[5] += f;
+                state[6] += g;
+                state[7] += h;
+            }
+        };
     }
 
-    void _transform(std::array<u32, 8> &state, const u8 *chunk)
-    {
-        std::array<u32, 64> w{};
-        for (int i = 0; i < 16; ++i)
-        {
-            w[i] = (static_cast<u32>(chunk[i * 4]) << 24) |
-                   (static_cast<u32>(chunk[i * 4 + 1]) << 16) |
-                   (static_cast<u32>(chunk[i * 4 + 2]) << 8) |
-                   static_cast<u32>(chunk[i * 4 + 3]);
-        }
-        for (int i = 16; i < 64; ++i)
-        {
-            const auto s0 = _rotr(w[i - 15], 7) ^ _rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
-            const auto s1 = _rotr(w[i - 2], 17) ^ _rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
-            w[i] = w[i - 16] + s0 + w[i - 7] + s1;
-        }
-
-        auto a = state[0], b = state[1], c = state[2], d = state[3];
-        auto e = state[4], f = state[5], g = state[6], h = state[7];
-        for (int i = 0; i < 64; ++i)
-        {
-            const auto s1 = _rotr(e, 6) ^ _rotr(e, 11) ^ _rotr(e, 25);
-            const auto ch = (e & f) ^ ((~e) & g);
-            const auto temp1 = h + s1 + ch + k[i] + w[i];
-            const auto s0 = _rotr(a, 2) ^ _rotr(a, 13) ^ _rotr(a, 22);
-            const auto maj = (a & b) ^ (a & c) ^ (b & c);
-            const auto temp2 = s0 + maj;
-            h = g;
-            g = f;
-            f = e;
-            e = d + temp1;
-            d = c;
-            c = b;
-            b = a;
-            a = temp1 + temp2;
-        }
-        state[0] += a;
-        state[1] += b;
-        state[2] += c;
-        state[3] += d;
-        state[4] += e;
-        state[5] += f;
-        state[6] += g;
-        state[7] += h;
-    }
-
-    std::string sha256File(const std::filesystem::path &path, std::string *error)
+    std::string Sha256::file(const std::filesystem::path &path, std::string *error)
     {
         std::ifstream input(path, std::ios::binary);
         if (!input)
@@ -88,9 +95,8 @@ namespace rhodium
             return {};
         }
 
-        std::array<u32, 8> state = {
-            0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
-            0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
+        std::array<u32, 8> state = {0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
+                                    0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
         std::vector<u8> data((std::istreambuf_iterator<char>(input)), {});
         const u64 bitLength = static_cast<u64>(data.size()) * 8u;
         data.push_back(0x80);
@@ -104,7 +110,7 @@ namespace rhodium
         }
         for (psize offset = 0; offset < data.size(); offset += 64)
         {
-            _transform(state, data.data() + offset);
+            Sha256Block::transform(state, data.data() + offset);
         }
 
         std::ostringstream out;
@@ -116,7 +122,7 @@ namespace rhodium
         return out.str();
     }
 
-    bool sha256Equals(const std::string &left, const std::string &right)
+    bool Sha256::equal(const std::string &left, const std::string &right)
     {
         if (left.size() != right.size())
         {

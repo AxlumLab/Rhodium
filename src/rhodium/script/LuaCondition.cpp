@@ -11,7 +11,7 @@
 namespace rhodium
 {
 
-    bool conditionMatches(const std::string &condition, const std::string &activePlatform)
+    bool LuaCondition::matches(const std::string &condition, const std::string &activePlatform)
     {
         const auto normalized = StringUtils::toLower(condition);
         if (normalized == "all" || normalized == "*")
@@ -29,17 +29,11 @@ namespace rhodium
         return normalized == activePlatform;
     }
 
-    bool isValidCondition(const std::string &condition)
+    bool LuaCondition::valid(const std::string &condition)
     {
         const auto normalized = StringUtils::toLower(condition);
-        return normalized == "all" ||
-               normalized == "*" ||
-               normalized == "unix" ||
-               normalized == "windows" ||
-               normalized == "linux" ||
-               normalized == "mac" ||
-               normalized == "macos" ||
-               normalized == "android" ||
+        return normalized == "all" || normalized == "*" || normalized == "unix" || normalized == "windows" ||
+               normalized == "linux" || normalized == "mac" || normalized == "macos" || normalized == "android" ||
                normalized == "ios";
     }
 

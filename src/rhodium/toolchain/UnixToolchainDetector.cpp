@@ -26,19 +26,15 @@ namespace rhodium
         static std::filesystem::path xfind(const std::string &tool);
         static std::filesystem::path sdkPath(const std::string &sdk);
         static std::string sdkVersion(const std::string &sdk);
-        static ToolchainProfile apple(const std::string &id,
-                                      const std::string &sdkKind,
-                                      const std::string &targetArch,
-                                      const std::string &targetTriple,
-                                      const std::string &deploymentTarget);
+        static ToolchainProfile apple(const std::string &id, const std::string &sdkKind, const std::string &targetArch,
+                                      const std::string &targetTriple, const std::string &deploymentTarget);
         static void addApple(std::vector<ToolchainProfile> &profiles);
         static void addCompilerSearchPaths(ToolchainProfile &profile);
         static void addIncludeSearchPaths(ToolchainProfile &profile);
         static void addLibrarySearchPaths(ToolchainProfile &profile);
         static void addFallbackSearchPaths(ToolchainProfile &profile);
         static std::string dumpMachine(const ToolchainProfile &profile);
-        static ToolchainProfile unixProfile(const std::string &compilerKind,
-                                            const std::string &cCompiler,
+        static ToolchainProfile unixProfile(const std::string &compilerKind, const std::string &cCompiler,
                                             const std::string &cxxCompiler);
     };
 
@@ -69,11 +65,9 @@ namespace rhodium
         const auto result = Process::run("xcrun", {"--sdk", sdk, "--show-sdk-version"});
         return result.exitCode == 0 ? ToolProbe::trim(result.output) : std::string{};
     }
-    ToolchainProfile UnixTc::apple(const std::string &id,
-                                   const std::string &sdkKind,
-                                   const std::string &targetArch,
-                                   const std::string &targetTriple,
-                                   const std::string &deploymentTarget)
+
+    ToolchainProfile UnixTc::apple(const std::string &id, const std::string &sdkKind, const std::string &targetArch,
+                                   const std::string &targetTriple, const std::string &deploymentTarget)
     {
         ToolchainProfile profile;
         profile.id = id;
@@ -125,6 +119,7 @@ namespace rhodium
             }
         }
     }
+
     void UnixTc::addCompilerSearchPaths(ToolchainProfile &profile)
     {
         addIncludeSearchPaths(profile);
@@ -250,8 +245,7 @@ namespace rhodium
         return result.exitCode == 0 ? ToolProbe::trim(result.output) : std::string{};
     }
 
-    ToolchainProfile UnixTc::unixProfile(const std::string &compilerKind,
-                                         const std::string &cCompiler,
+    ToolchainProfile UnixTc::unixProfile(const std::string &compilerKind, const std::string &cCompiler,
                                          const std::string &cxxCompiler)
     {
         ToolchainProfile profile;
@@ -261,10 +255,10 @@ namespace rhodium
         profile.targetArch = ToolProbe::arch();
         profile.compilerKind = compilerKind;
         profile.sdkKind = "sysroot";
-        profile.compiler = findExecutableOnPath(cCompiler);
-        profile.cxxCompiler = findExecutableOnPath(cxxCompiler);
+        profile.compiler = ToolchainDetector::findExecutable(cCompiler);
+        profile.cxxCompiler = ToolchainDetector::findExecutable(cxxCompiler);
         profile.linker = profile.cxxCompiler.empty() ? profile.compiler : profile.cxxCompiler;
-        profile.archiver = findExecutableOnPath("ar");
+        profile.archiver = ToolchainDetector::findExecutable("ar");
         if (!profile.compiler.empty())
         {
             ToolProbe::appendDir(profile.binaryDirs, profile.compiler.parent_path());
@@ -295,7 +289,7 @@ namespace rhodium
         addApple(profiles);
     }
 
-    void addUnixProfiles(std::vector<ToolchainProfile> &profiles)
+    void ToolchainDetector::unixProfiles(std::vector<ToolchainProfile> &profiles)
     {
         UnixTc::add(profiles);
     }

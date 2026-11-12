@@ -23,6 +23,10 @@ namespace rhodium
         std::string manifestName = "rhodium.lua";
     };
 
-    bool validateBuildModel(const BuildModel &model, DiagnosticSink &diagnostics);
+    class ModelValidator
+    {
+    public:
+        static bool validate(const BuildModel &model, DiagnosticSink &diagnostics);
+    };
 
 } // namespace rhodium

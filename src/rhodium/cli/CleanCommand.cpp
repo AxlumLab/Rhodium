@@ -11,182 +11,231 @@
 
 namespace rhodium
 {
-    int Commands::clean(const std::filesystem::path &workspaceRoot,
-                     bool all,
-                     bool artifacts,
-                     bool sources,
-                     bool lock,
-                     const std::string &packageName)
+    namespace
     {
-        ConsoleDiagnosticSink diagnostics;
-        if (all && (artifacts || sources || !packageName.empty()))
+        class CleanSession final
         {
-            diagnostics.error("clean --all already removes the active state directory; do not combine it with --artifacts, --sources, or a package name");
-            return 1;
-        }
-
-        const auto rhodiumRoot = Path::stateRoot(workspaceRoot);
-        std::error_code canonicalEc;
-        auto normalizedWorkspaceRoot = std::filesystem::weakly_canonical(workspaceRoot, canonicalEc);
-        if (canonicalEc)
-        {
-            canonicalEc.clear();
-            normalizedWorkspaceRoot = std::filesystem::absolute(workspaceRoot, canonicalEc).lexically_normal();
-            if (canonicalEc)
+        public:
+            CleanSession(const std::filesystem::path &workspaceRoot, const CleanOptions &options,
+                         DiagnosticSink &diagnostics)
+                : workspaceRoot(workspaceRoot), options(options), diagnostics(diagnostics),
+                  rhodiumRoot(Path::stateRoot(workspaceRoot))
             {
-                diagnostics.error("failed to resolve workspace root for clean: " + canonicalEc.message());
-                return 1;
-            }
-        }
-        const auto normalizedRHODIUMRoot = (normalizedWorkspaceRoot / rhodiumRoot.filename()).lexically_normal();
-        auto isAllowedCleanPath = [&](const std::filesystem::path &path) -> bool
-        {
-            std::error_code ec;
-            auto absolutePath = std::filesystem::absolute(path, ec);
-            if (ec)
-            {
-                return false;
-            }
-            absolutePath = absolutePath.lexically_normal();
-
-            const auto lowerPath = StringUtils::toLower(absolutePath.string());
-            const auto lowerRHODIUMRoot = StringUtils::toLower(normalizedRHODIUMRoot.string());
-            if (lowerPath == lowerRHODIUMRoot)
-            {
-                return true;
             }
 
-            auto lowerPrefix = lowerRHODIUMRoot;
-            if (!lowerPrefix.empty() && lowerPrefix.back() != '\\' && lowerPrefix.back() != '/')
+            int run()
             {
-                lowerPrefix.push_back(std::filesystem::path::preferred_separator);
-            }
-            return lowerPath.rfind(lowerPrefix, 0) == 0;
-        };
-
-        auto removePath = [&](const std::filesystem::path &path) -> bool
-        {
-            if (!isAllowedCleanPath(path))
-            {
-                diagnostics.error("refusing to clean path outside the active state directory: " + path.string());
-                return false;
-            }
-            std::error_code ec;
-            if (!std::filesystem::exists(path, ec))
-            {
-                diagnostics.info("skip missing " + path.string());
-                return true;
-            }
-            const auto removed = std::filesystem::remove_all(path, ec);
-            if (ec)
-            {
-                diagnostics.error("failed to remove " + path.string() + ": " + ec.message());
-                return false;
-            }
-            diagnostics.info("removed " + path.string() + " (" + std::to_string(removed) + " entries)");
-            return true;
-        };
-
-        bool ok = true;
-        if (all)
-        {
-            ok &= removePath(rhodiumRoot);
-        }
-        else
-        {
-            if (!packageName.empty())
-            {
-                ok &= removePath(rhodiumRoot / "build-packages" / Path::sanitizePackagePath(packageName));
-                if (artifacts)
+                const auto &[all, artifacts, sources, lock, packageName] = options;
+                if (all && (artifacts || sources || !packageName.empty()))
                 {
-                    ok &= removePath(rhodiumRoot / "artifacts" / Path::sanitizePackagePath(packageName));
+                    diagnostics.error("clean --all already removes the active state directory; do not combine it with "
+                                      "--artifacts, --sources, or a package name");
+                    return 1;
                 }
-                if (sources)
+                if (!resolveRoot())
                 {
-                    ok &= removePath(rhodiumRoot / "packages" / Path::sanitizePackagePath(packageName));
+                    return 1;
                 }
-            }
-            else
-            {
-                ok &= removePath(rhodiumRoot / "generated");
-                ok &= removePath(rhodiumRoot / "tmp");
-                ok &= removePath(rhodiumRoot / "build-packages");
-                if (artifacts)
+                bool ok = cleanCaches();
+                if (lock)
                 {
-                    ok &= removePath(rhodiumRoot / "artifacts");
+                    ok &= cleanLock();
                 }
-                if (sources)
+                return ok ? 0 : 1;
+            }
+
+        private:
+            bool resolveRoot()
+            {
+                std::error_code canonicalEc;
+                auto normalizedWorkspaceRoot = std::filesystem::weakly_canonical(workspaceRoot, canonicalEc);
+                if (canonicalEc)
                 {
-                    ok &= removePath(rhodiumRoot / "packages");
-                }
-            }
-        }
-        if (lock)
-        {
-            std::error_code ec;
-            const auto lockPath = workspaceRoot / "tpkg.lock.toml";
-            if (!std::filesystem::exists(lockPath, ec))
-            {
-                diagnostics.info("skip missing " + lockPath.string());
-            }
-            else if (!std::filesystem::is_regular_file(lockPath, ec))
-            {
-                diagnostics.error("refusing to remove non-file lock path: " + lockPath.string());
-                ok = false;
-            }
-            else
-            {
-                if (!packageName.empty())
-                {
-                    LockFile lockFile;
-                    if (!LockFile::read(lockPath, lockFile, diagnostics))
+                    canonicalEc.clear();
+                    normalizedWorkspaceRoot = std::filesystem::absolute(workspaceRoot, canonicalEc).lexically_normal();
+                    if (canonicalEc)
                     {
-                        ok = false;
+                        diagnostics.error("failed to resolve workspace root for clean: " + canonicalEc.message());
+                        return false;
+                    }
+                }
+                normalizedRHODIUMRoot = (normalizedWorkspaceRoot / rhodiumRoot.filename()).lexically_normal();
+
+                return true;
+            }
+
+            bool allowed(const std::filesystem::path &path) const
+            {
+                std::error_code ec;
+                auto absolutePath = std::filesystem::absolute(path, ec);
+                if (ec)
+                {
+                    return false;
+                }
+                absolutePath = absolutePath.lexically_normal();
+
+                const auto lowerPath = StringUtils::toLower(absolutePath.string());
+                const auto lowerRHODIUMRoot = StringUtils::toLower(normalizedRHODIUMRoot.string());
+                if (lowerPath == lowerRHODIUMRoot)
+                {
+                    return true;
+                }
+
+                auto lowerPrefix = lowerRHODIUMRoot;
+                if (!lowerPrefix.empty() && lowerPrefix.back() != '\\' && lowerPrefix.back() != '/')
+                {
+                    lowerPrefix.push_back(std::filesystem::path::preferred_separator);
+                }
+                return lowerPath.rfind(lowerPrefix, 0) == 0;
+            }
+
+            bool remove(const std::filesystem::path &path)
+            {
+                if (!allowed(path))
+                {
+                    diagnostics.error("refusing to clean path outside the active state directory: " + path.string());
+                    return false;
+                }
+                std::error_code ec;
+                if (!std::filesystem::exists(path, ec))
+                {
+                    diagnostics.info("skip missing " + path.string());
+                    return true;
+                }
+                const auto removed = std::filesystem::remove_all(path, ec);
+                if (ec)
+                {
+                    diagnostics.error("failed to remove " + path.string() + ": " + ec.message());
+                    return false;
+                }
+                diagnostics.info("removed " + path.string() + " (" + std::to_string(removed) + " entries)");
+                return true;
+            }
+
+            bool cleanCaches()
+            {
+                const auto &[all, artifacts, sources, lock, packageName] = options;
+                bool ok = true;
+                if (all)
+                {
+                    ok &= remove(rhodiumRoot);
+                }
+                else
+                {
+                    if (!packageName.empty())
+                    {
+                        ok &= remove(rhodiumRoot / "build-packages" / Path::sanitizePackagePath(packageName));
+                        if (artifacts)
+                        {
+                            ok &= remove(rhodiumRoot / "artifacts" / Path::sanitizePackagePath(packageName));
+                        }
+                        if (sources)
+                        {
+                            ok &= remove(rhodiumRoot / "packages" / Path::sanitizePackagePath(packageName));
+                        }
                     }
                     else
                     {
-                        const auto before = lockFile.packages.size();
-                        lockFile.packages.erase(std::remove_if(lockFile.packages.begin(),
-                                                               lockFile.packages.end(),
-                                                               [&](const LockedPackage &package)
-                                                               { return package.name == packageName; }),
-                                                lockFile.packages.end());
-                        if (lockFile.packages.size() == before)
+                        ok &= remove(rhodiumRoot / "generated");
+                        ok &= remove(rhodiumRoot / "tmp");
+                        ok &= remove(rhodiumRoot / "build-packages");
+                        if (artifacts)
                         {
-                            diagnostics.info("skip missing lock entries for package " + packageName);
+                            ok &= remove(rhodiumRoot / "artifacts");
                         }
-                        else if (!LockFile::write(lockPath, lockFile, diagnostics))
+                        if (sources)
+                        {
+                            ok &= remove(rhodiumRoot / "packages");
+                        }
+                    }
+                }
+
+                return ok;
+            }
+
+            bool cleanLock()
+            {
+                const auto &packageName = options.packageName;
+                bool ok = true;
+
+                std::error_code ec;
+                const auto lockPath = workspaceRoot / "tpkg.lock.toml";
+                if (!std::filesystem::exists(lockPath, ec))
+                {
+                    diagnostics.info("skip missing " + lockPath.string());
+                }
+                else if (!std::filesystem::is_regular_file(lockPath, ec))
+                {
+                    diagnostics.error("refusing to remove non-file lock path: " + lockPath.string());
+                    ok = false;
+                }
+                else
+                {
+                    if (!packageName.empty())
+                    {
+                        LockFile lockFile;
+                        if (!LockFile::read(lockPath, lockFile, diagnostics))
                         {
                             ok = false;
                         }
                         else
                         {
-                            diagnostics.info("removed lock entries for package " + packageName);
+                            const auto before = lockFile.packages.size();
+                            lockFile.packages.erase(std::remove_if(lockFile.packages.begin(), lockFile.packages.end(),
+                                                                   [&](const LockedPackage &package)
+                                                                   {
+                                                                       return package.name == packageName;
+                                                                   }),
+                                                    lockFile.packages.end());
+                            if (lockFile.packages.size() == before)
+                            {
+                                diagnostics.info("skip missing lock entries for package " + packageName);
+                            }
+                            else if (!LockFile::write(lockPath, lockFile, diagnostics))
+                            {
+                                ok = false;
+                            }
+                            else
+                            {
+                                diagnostics.info("removed lock entries for package " + packageName);
+                            }
                         }
-                    }
-                }
-                else
-                {
-                    const auto removed = std::filesystem::remove(lockPath, ec);
-                    if (ec)
-                    {
-                        diagnostics.error("failed to remove " + lockPath.string() + ": " + ec.message());
-                        ok = false;
-                    }
-                    else if (!removed)
-                    {
-                        diagnostics.error("failed to remove " + lockPath.string());
-                        ok = false;
                     }
                     else
                     {
-                        diagnostics.info("removed " + lockPath.string());
+                        const auto removed = std::filesystem::remove(lockPath, ec);
+                        if (ec)
+                        {
+                            diagnostics.error("failed to remove " + lockPath.string() + ": " + ec.message());
+                            ok = false;
+                        }
+                        else if (!removed)
+                        {
+                            diagnostics.error("failed to remove " + lockPath.string());
+                            ok = false;
+                        }
+                        else
+                        {
+                            diagnostics.info("removed " + lockPath.string());
+                        }
                     }
                 }
+
+                return ok;
             }
-        }
-        return ok ? 0 : 1;
+
+            const std::filesystem::path &workspaceRoot;
+            const CleanOptions &options;
+            DiagnosticSink &diagnostics;
+            const std::filesystem::path rhodiumRoot;
+            std::filesystem::path normalizedRHODIUMRoot;
+        };
     }
 
+    int Commands::clean(const std::filesystem::path &workspaceRoot, const CleanOptions &options)
+    {
+        ConsoleDiagnosticSink diagnostics;
+        return CleanSession(workspaceRoot, options, diagnostics).run();
+    }
 
 } // namespace rhodium

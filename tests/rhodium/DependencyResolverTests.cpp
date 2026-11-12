@@ -276,7 +276,9 @@ int value() {
 
         rhodium::DependencyResolver resolver;
         rhodium::JsonDiagnosticSink firstDiagnostics;
-        ASSERT_FALSE(resolver.restore(model, dir, firstDiagnostics, "windows-msvc-x64", "debug"));
+        ASSERT_FALSE(resolver.restore(
+            model, dir, firstDiagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}));
 
         rhodium::PackageCache cache(dir / ".rhodium/packages");
         const auto sourcePath = cache.source(dependency);
@@ -287,7 +289,9 @@ int value() {
         writeText(buildDir / "stale.txt", "stale build cache\n");
 
         rhodium::JsonDiagnosticSink secondDiagnostics;
-        ASSERT_FALSE(resolver.restore(model, dir, secondDiagnostics, "windows-msvc-x64", "debug"));
+        ASSERT_FALSE(resolver.restore(
+            model, dir, secondDiagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}));
         EXPECT_TRUE(rhodium::File::dir(sourcePath / ".git"));
         EXPECT_EQ(directoryCount(cache.sourceRoot(dependency)), 1u);
         EXPECT_EQ(secondDiagnostics.diagnostics().dump().find("cloning package"), std::string::npos);
@@ -296,7 +300,10 @@ int value() {
         rhodium::DependencyRestoreOptions rebuild;
         rebuild.rebuild = true;
         rhodium::JsonDiagnosticSink rebuildDiagnostics;
-        ASSERT_FALSE(resolver.restore(model, dir, rebuildDiagnostics, "windows-msvc-x64", "debug", {}, rebuild));
+        ASSERT_FALSE(resolver.restore(
+            model, dir, rebuildDiagnostics,
+            rhodium::DependencyRestoreRequest{
+                .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = rebuild}));
         EXPECT_FALSE(rhodium::File::exists(buildDir / "stale.txt"));
 
         std::filesystem::remove_all(dir);
@@ -314,7 +321,7 @@ int value() {
         dependency.name = "hello-lib";
         dependency.source = "third_party/hello-lib.zip";
         dependency.sourceType = "archive";
-        dependency.sha256 = rhodium::sha256File(archivePath);
+        dependency.sha256 = rhodium::Sha256::file(archivePath);
         dependency.stripComponents = 1;
         dependency.buildType = "header_only";
         dependency.artifacts.includeDirs.push_back("include");
@@ -322,7 +329,10 @@ int value() {
 
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::DependencyResolver resolver;
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug")) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
@@ -346,8 +356,14 @@ int value() {
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::DependencyResolver resolver;
         const auto model = localHeaderOnlyModel();
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug")) << diagnostics.diagnostics().dump();
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "release")) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}))
+            << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "release"}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
@@ -366,8 +382,14 @@ int value() {
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::DependencyResolver resolver;
         const auto model = localHeaderOnlyModel();
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug")) << diagnostics.diagnostics().dump();
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "android-clang-arm64", "debug")) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}))
+            << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "android-clang-arm64", .config = "debug"}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
@@ -387,11 +409,18 @@ int value() {
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::DependencyResolver resolver;
         const auto model = localHeaderOnlyModel();
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug")) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64", .config = "debug"}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::DependencyOverrideSet overrides;
         overrides.overrides["HeaderOnly"].path = dir / "override/HeaderOnly";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", overrides)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics,
+                                     rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64",
+                                                                       .config = "debug",
+                                                                       .overrides = overrides}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
@@ -412,7 +441,10 @@ int value() {
         rhodium::DependencyResolver resolver;
         rhodium::DependencyRestoreOptions options;
         options.locked = true;
-        EXPECT_FALSE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", {}, options));
+        EXPECT_FALSE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{
+                .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = options}));
         EXPECT_NE(diagnostics.diagnostics().dump().find("restore --locked requires an existing lock entry"), std::string::npos);
 
         std::filesystem::remove_all(dir);
@@ -428,13 +460,21 @@ int value() {
         rhodium::DependencyResolver resolver;
         rhodium::DependencyRestoreOptions options;
         options.toolchainContentHash = "toolchain-a";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", {}, options)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{
+                .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = options}))
+            << diagnostics.diagnostics().dump();
         const auto before = rhodium::File::read(dir / "tpkg.lock.toml");
 
         rhodium::DependencyRestoreOptions locked;
         locked.locked = true;
         locked.toolchainContentHash = "toolchain-a";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", {}, locked)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{
+                .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = locked}))
+            << diagnostics.diagnostics().dump();
         EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
 
         std::filesystem::remove_all(dir);
@@ -455,7 +495,11 @@ int value() {
         rhodium::DependencyResolver resolver;
         rhodium::DependencyRestoreOptions firstOptions;
         firstOptions.toolchainContentHash = "toolchain-a";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", {}, firstOptions)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(
+            model, dir, diagnostics,
+            rhodium::DependencyRestoreRequest{
+                .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = firstOptions}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile before;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", before, diagnostics)) << diagnostics.diagnostics().dump();
@@ -464,7 +508,12 @@ int value() {
         rhodium::DependencyRestoreOptions updateOptions;
         updateOptions.updatePackage = "A";
         updateOptions.toolchainContentHash = "toolchain-b";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, "windows-msvc-x64", "debug", {}, updateOptions)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics,
+                                     rhodium::DependencyRestoreRequest{.preferredToolchain = "windows-msvc-x64",
+                                                                       .config = "debug",
+                                                                       .overrides = {},
+                                                                       .options = updateOptions}))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile after;
         ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", after, diagnostics)) << diagnostics.diagnostics().dump();

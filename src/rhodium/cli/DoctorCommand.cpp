@@ -30,12 +30,10 @@ namespace rhodium
     class DoctorCli final
     {
     public:
-        static bool checkTool(const std::string &name,
-                              const std::vector<std::string> &versionArgs,
-                              const std::string &reason,
-                              DiagnosticSink &diagnostics)
+        static bool checkTool(const std::string &name, const std::vector<std::string> &versionArgs,
+                              const std::string &reason, DiagnosticSink &diagnostics)
         {
-            const auto executable = findExecutableOnPath(name);
+            const auto executable = ToolchainDetector::findExecutable(name);
             if (executable.empty())
             {
                 LogInfo("{}: missing", name);
@@ -68,7 +66,8 @@ namespace rhodium
         {
             const auto newline = text.find_first_of("\r\n");
             auto line = newline == std::string::npos ? text : text.substr(0, newline);
-            while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t'))
+            while (!line.empty() &&
+                   (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t'))
             {
                 line.pop_back();
             }
@@ -90,38 +89,34 @@ namespace rhodium
 
         std::string error;
         const bool rhodiumWritable = File::mkdir(Path::stateRoot(workspaceRoot), &error);
-        LogInfo("{}: {}", Path::stateRoot(workspaceRoot).filename().string(), rhodiumWritable ? "writable" : ("error: " + error));
+        LogInfo("{}: {}", Path::stateRoot(workspaceRoot).filename().string(),
+                rhodiumWritable ? "writable" : ("error: " + error));
         ok &= rhodiumWritable;
 
         LogInfo("core tools:");
-        ok &= DoctorCli::checkTool("git",
-                                   {"--version"},
-                                   "git is used for source acquisition and version control",
+        ok &= DoctorCli::checkTool("git", {"--version"}, "git is used for source acquisition and version control",
                                    diagnostics);
-        ok &= DoctorCli::checkTool("cmake",
-                                   {"--version"},
-                                   "cmake is required for building dependencies",
-                                   diagnostics);
+        ok &= DoctorCli::checkTool("cmake", {"--version"}, "cmake is required for building dependencies", diagnostics);
 
         LogInfo("platform: {}", Environment::hostPlatformName());
         LogInfo("compiler: {}", Environment::compilerName());
         LogInfo("build_mode: {}", Environment::buildModeName());
 
-        auto loadedProfiles = loadMergedToolchains(workspaceRoot, diagnostics);
+        auto loadedProfiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
         if (loadedProfiles.empty())
         {
             std::vector<ToolchainProfile> refreshed;
-            if (detectAndWriteHostToolchains(workspaceRoot, refreshed, diagnostics))
+            if (ToolchainDetector::writeHost(workspaceRoot, refreshed, diagnostics))
             {
-                loadedProfiles = loadMergedToolchains(workspaceRoot, diagnostics);
+                loadedProfiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
             }
         }
-        const auto profiles = unwrapToolchainProfiles(loadedProfiles);
+        const auto profiles = ToolchainRegistry::profiles(loadedProfiles);
         LogInfo("toolchains: {}", profiles.empty() ? "missing" : std::to_string(profiles.size()));
         ok &= !profiles.empty();
         if (sdkDetails)
         {
-            ok &= printSdkDoctor(workspaceRoot);
+            ok &= SdkDoctor::print(workspaceRoot);
         }
 
         if (!ok)

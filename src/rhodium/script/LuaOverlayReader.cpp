@@ -14,7 +14,8 @@
 namespace rhodium
 {
 
-    std::optional<sol::table> findPlatformTable(sol::table options, const char *field, const std::string &activePlatform)
+    std::optional<sol::table> LuaOverlayReader::table(sol::table options, const char *field,
+                                                      const std::string &activePlatform)
     {
         sol::object platformsValue = options[field];
         if (!platformsValue.is<sol::table>())
@@ -42,32 +43,33 @@ namespace rhodium
         return std::nullopt;
     }
 
-    std::optional<sol::table> findPlatformOverlay(sol::table options, const std::string &activePlatform)
+    std::optional<sol::table> LuaOverlayReader::platform(sol::table options, const std::string &activePlatform)
     {
-        return findPlatformTable(options, "platforms", activePlatform);
+        return LuaOverlayReader::table(options, "platforms", activePlatform);
     }
 
-    std::optional<sol::table> findCustomCompileOverlay(sol::table options, const std::string &activePlatform)
+    std::optional<sol::table> LuaOverlayReader::custom(sol::table options, const std::string &activePlatform)
     {
-        return findPlatformTable(options, "custom_compile", activePlatform);
+        return LuaOverlayReader::table(options, "custom_compile", activePlatform);
     }
 
-    void applyDependencyOverlays(sol::table options, DependencyDesc &dependency, const std::string &activePlatform)
+    void LuaOverlayReader::apply(sol::table options, DependencyDesc &dependency, const std::string &activePlatform)
     {
-        if (auto overlay = findPlatformOverlay(options, activePlatform))
+        if (auto overlay = LuaOverlayReader::platform(options, activePlatform))
         {
-            overlayDependencyOptions(*overlay, dependency);
-            setStringIfPresent(*overlay, "sha256", dependency.sha256);
-            if (hasField(*overlay, "strip_components"))
+            LuaDependencyReader::overlay(*overlay, dependency);
+            LuaValueReader::setString(*overlay, "sha256", dependency.sha256);
+            if (LuaValueReader::has(*overlay, "strip_components"))
             {
-                dependency.stripComponents = getIntOr(*overlay, "strip_components", dependency.stripComponents);
+                dependency.stripComponents =
+                    LuaValueReader::integer(*overlay, "strip_components", dependency.stripComponents);
             }
-            setStringArrayIfPresent(*overlay, "patches", dependency.patches);
+            LuaValueReader::setArray(*overlay, "patches", dependency.patches);
         }
-        if (auto customCompile = findCustomCompileOverlay(options, activePlatform))
+        if (auto customCompile = LuaOverlayReader::custom(options, activePlatform))
         {
             dependency.buildType = "custom";
-            overlayDependencyOptions(*customCompile, dependency);
+            LuaDependencyReader::overlay(*customCompile, dependency);
         }
     }
 

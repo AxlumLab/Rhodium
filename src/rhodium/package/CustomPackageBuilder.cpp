@@ -46,10 +46,8 @@ namespace rhodium
         return listing.str();
     }
 
-    bool CustomPackageBuilder::run(const std::vector<std::string> &commands,
-                                   const std::string &phase,
-                                   const BuildUtil::Context &context,
-                                   DiagnosticSink &diagnostics)
+    bool CustomPackageBuilder::run(const std::vector<std::string> &commands, const std::string &phase,
+                                   const BuildUtil::Context &context, DiagnosticSink &diagnostics)
     {
         for (std::size_t index = 0; index < commands.size(); ++index)
         {
@@ -57,10 +55,12 @@ namespace rhodium
             diagnostics.info("custom package " + phase + ": " + expanded);
 
 #ifdef _WIN32
-            const auto scriptPath = context.buildDir / ("rhodium-custom-" + phase + "-" + std::to_string(index) + ".cmd");
+            const auto scriptPath =
+                context.buildDir / ("rhodium-custom-" + phase + "-" + std::to_string(index) + ".cmd");
             const std::string script = "@echo off\r\n" + expanded + "\r\n";
 #else
-            const auto scriptPath = context.buildDir / ("rhodium-custom-" + phase + "-" + std::to_string(index) + ".sh");
+            const auto scriptPath =
+                context.buildDir / ("rhodium-custom-" + phase + "-" + std::to_string(index) + ".sh");
             const std::string script = "#!/bin/sh\nset -e\n" + expanded + "\n";
 #endif
             std::string error;
@@ -88,18 +88,11 @@ namespace rhodium
         return true;
     }
 
-    bool CustomPackageBuilder::build(const DependencyDesc &dependency,
-                                     const std::filesystem::path &sourceDir,
-                                     const std::filesystem::path &buildDir,
-                                     const std::filesystem::path &artifactDir,
-                                     const std::string &commit,
-                                     const std::filesystem::path &workspaceRoot,
-                                     const std::string &preferredToolchain,
-                                     const std::string &config,
-                                     const PackageBuildOptions &options,
-                                     PackageArtifact &artifact,
+    bool CustomPackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
                                      DiagnosticSink &diagnostics) const
     {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
         std::string error;
         if (!File::mkdir(buildDir, &error) || !File::mkdir(artifactDir, &error))
         {

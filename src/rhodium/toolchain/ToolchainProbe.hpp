@@ -45,14 +45,15 @@ namespace rhodium
         static void complete(ToolchainProfile &profile);
 
     private:
+        static void androidTools(const ToolchainProfile &profile, std::vector<std::string> &requiredMissing,
+                                 std::vector<std::string> &optionalMissing);
+        static void completeAndroid(ToolchainProfile &profile);
+        static void completeDesktop(ToolchainProfile &profile, bool usesSdkSysroot);
+        static void completeWindows(ToolchainProfile &profile);
         static bool hasPart(const std::filesystem::path &path, const std::string &part);
         static bool hasMsvcLib(const ToolchainProfile &profile);
         static bool hasUcrtLib(const ToolchainProfile &profile);
         static bool hasUmLib(const ToolchainProfile &profile);
         static bool hasInclude(const ToolchainProfile &profile, const std::string &part);
     };
-
-    void addWindowsProfiles(std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    void addAndroidProfiles(std::vector<ToolchainProfile> &profiles, const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics);
-    void addUnixProfiles(std::vector<ToolchainProfile> &profiles);
 }

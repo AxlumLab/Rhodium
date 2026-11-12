@@ -11,9 +11,11 @@
 namespace rhodium
 {
 
-    void reportUnsupportedProjectDsl(DiagnosticSink &diagnostics, const std::string &name)
+    void LuaDslDiagnostics::unsupported(DiagnosticSink &diagnostics, const std::string &name)
     {
-        diagnostics.error("project build DSL '" + name + "' is not supported in rhodium.lua or tpkg.lua; use require()/require_local() to declare dependencies");
+        diagnostics.error(
+            "project build DSL '" + name +
+            "' is not supported in rhodium.lua or tpkg.lua; use require()/require_local() to declare dependencies");
     }
 
 } // namespace rhodium

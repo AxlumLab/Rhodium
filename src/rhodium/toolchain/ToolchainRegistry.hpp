@@ -44,18 +44,31 @@ namespace rhodium
         std::vector<ToolchainOverrideRecord> overridden;
     };
 
-    const char *toString(ToolchainSource source);
-    bool parseToolchainSource(const std::string &value, ToolchainSource &source);
-    std::filesystem::path projectUserToolchainsPath(const std::filesystem::path &workspaceRoot);
-    std::filesystem::path globalUserToolchainsPath();
-    std::vector<LoadedToolchainProfile> loadToolchainSources(const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics);
-    std::vector<LoadedToolchainProfile> loadMergedToolchains(const std::filesystem::path &workspaceRoot, DiagnosticSink &diagnostics);
-    std::vector<ToolchainProfile> unwrapToolchainProfiles(const std::vector<LoadedToolchainProfile> &profiles);
-    bool writeUserToolchainProfiles(const std::filesystem::path &workspaceRoot, ToolchainSource source, const std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    bool readUserToolchainProfiles(const std::filesystem::path &workspaceRoot, ToolchainSource source, std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    bool writeToolchainProfiles(const std::filesystem::path &path, const std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    bool readToolchainProfiles(const std::filesystem::path &path, std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
-    std::filesystem::path localToolchainConfigPath(const std::filesystem::path &workspaceRoot);
-    bool readLocalToolchainConfig(const std::filesystem::path &workspaceRoot, LocalToolchainConfig &config, DiagnosticSink &diagnostics);
-    bool writeLocalToolchainConfig(const std::filesystem::path &workspaceRoot, const LocalToolchainConfig &config, DiagnosticSink &diagnostics);
+    class ToolchainRegistry
+    {
+    public:
+        static const char *name(ToolchainSource source);
+        static bool parseSource(const std::string &value, ToolchainSource &source);
+        static std::filesystem::path projectPath(const std::filesystem::path &workspaceRoot);
+        static std::filesystem::path globalPath();
+        static std::vector<LoadedToolchainProfile> sources(const std::filesystem::path &workspaceRoot,
+                                                           DiagnosticSink &diagnostics);
+        static std::vector<LoadedToolchainProfile> load(const std::filesystem::path &workspaceRoot,
+                                                        DiagnosticSink &diagnostics);
+        static std::vector<ToolchainProfile> profiles(const std::vector<LoadedToolchainProfile> &profiles);
+        static bool writeUser(const std::filesystem::path &workspaceRoot, ToolchainSource source,
+                              const std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
+        static bool readUser(const std::filesystem::path &workspaceRoot, ToolchainSource source,
+                             std::vector<ToolchainProfile> &profiles, DiagnosticSink &diagnostics);
+        static bool write(const std::filesystem::path &path, const std::vector<ToolchainProfile> &profiles,
+                          DiagnosticSink &diagnostics);
+        static bool read(const std::filesystem::path &path, std::vector<ToolchainProfile> &profiles,
+                         DiagnosticSink &diagnostics);
+        static std::filesystem::path configPath(const std::filesystem::path &workspaceRoot);
+        static bool readConfig(const std::filesystem::path &workspaceRoot, LocalToolchainConfig &config,
+                               DiagnosticSink &diagnostics);
+        static bool writeConfig(const std::filesystem::path &workspaceRoot, const LocalToolchainConfig &config,
+                                DiagnosticSink &diagnostics);
+    };
+
 }

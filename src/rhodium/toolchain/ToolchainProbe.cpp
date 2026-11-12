@@ -64,10 +64,16 @@ namespace rhodium
 
     std::string ToolProbe::trim(std::string value)
     {
-        value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char c)
-                                                { return std::isspace(c) == 0; }));
-        value.erase(std::find_if(value.rbegin(), value.rend(), [](unsigned char c)
-                                 { return std::isspace(c) == 0; })
+        value.erase(value.begin(), std::find_if(value.begin(), value.end(),
+                                                [](unsigned char c)
+                                                {
+                                                    return std::isspace(c) == 0;
+                                                }));
+        value.erase(std::find_if(value.rbegin(), value.rend(),
+                                 [](unsigned char c)
+                                 {
+                                     return std::isspace(c) == 0;
+                                 })
                         .base(),
                     value.end());
         return value;
@@ -163,7 +169,8 @@ namespace rhodium
 
     void ToolProbe::appendDir(std::vector<std::filesystem::path> &values, const std::filesystem::path &path)
     {
-        if (!path.empty() && std::filesystem::is_directory(path) && std::find(values.begin(), values.end(), path) == values.end())
+        if (!path.empty() && std::filesystem::is_directory(path) &&
+            std::find(values.begin(), values.end(), path) == values.end())
         {
             values.push_back(path);
         }
@@ -183,8 +190,11 @@ namespace rhodium
                 dirs.push_back(entry.path());
             }
         }
-        std::sort(dirs.begin(), dirs.end(), [](const auto &lhs, const auto &rhs)
-                  { return ToolProbe::newer(lhs.filename().string(), rhs.filename().string()); });
+        std::sort(dirs.begin(), dirs.end(),
+                  [](const auto &lhs, const auto &rhs)
+                  {
+                      return ToolProbe::newer(lhs.filename().string(), rhs.filename().string());
+                  });
         return dirs.empty() ? std::filesystem::path{} : dirs.front();
     }
 
@@ -198,8 +208,11 @@ namespace rhodium
                 dirs.push_back(root);
             }
         }
-        std::sort(dirs.begin(), dirs.end(), [](const auto &lhs, const auto &rhs)
-                  { return ToolProbe::newer(lhs.filename().string(), rhs.filename().string()); });
+        std::sort(dirs.begin(), dirs.end(),
+                  [](const auto &lhs, const auto &rhs)
+                  {
+                      return ToolProbe::newer(lhs.filename().string(), rhs.filename().string());
+                  });
         return dirs.empty() ? std::filesystem::path{} : dirs.front();
     }
 
@@ -217,9 +230,9 @@ namespace rhodium
 
     void ToolProbe::addTools(ToolchainProfile &profile)
     {
-        profile.cmake = findExecutableOnPath("cmake");
-        profile.ninja = findExecutableOnPath("ninja");
-        profile.git = findExecutableOnPath("git");
+        profile.cmake = ToolchainDetector::findExecutable("cmake");
+        profile.ninja = ToolchainDetector::findExecutable("ninja");
+        profile.git = ToolchainDetector::findExecutable("git");
     }
 
     void ToolProbe::appendEnvDir(std::vector<std::filesystem::path> &paths, const char *key)
@@ -293,22 +306,23 @@ namespace rhodium
         {
             return candidate;
         }
-        return findExecutableOnPath(fallback);
+        return ToolchainDetector::findExecutable(fallback);
     }
 
     std::filesystem::path ToolProbe::gradle()
     {
-        auto gradle = findExecutableOnPath("gradle");
+        auto gradle = ToolchainDetector::findExecutable("gradle");
         if (!gradle.empty())
         {
             return gradle;
         }
 #ifdef _WIN32
-        return findExecutableOnPath("gradle.bat");
+        return ToolchainDetector::findExecutable("gradle.bat");
 #else
         return {};
 #endif
     }
+
     void ToolProbe::addPath(ToolchainProfile &profile)
     {
         std::string path;
@@ -384,7 +398,7 @@ namespace rhodium
         else if (platform == "macos")
         {
             tags = ToolProbe::arch() == "arm64" ? std::vector<std::string>{"darwin-arm64", "darwin-x86_64"}
-                                             : std::vector<std::string>{"darwin-x86_64", "darwin-arm64"};
+                                                : std::vector<std::string>{"darwin-x86_64", "darwin-arm64"};
         }
         else
         {
@@ -410,115 +424,139 @@ namespace rhodium
     bool ToolProbe::hasMsvcLib(const ToolchainProfile &profile)
     {
         const auto suffix = "/lib/" + StringUtils::toLower(profile.targetArch);
-        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [](const auto &dir)
-                           { return ToolProbe::hasPart(dir, "/vc/tools/msvc/") && ToolProbe::hasPart(dir, "/lib/"); }) &&
-               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [&](const auto &dir)
-                           { return ToolProbe::hasPart(dir, suffix); });
+        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, "/vc/tools/msvc/") && ToolProbe::hasPart(dir, "/lib/");
+                           }) &&
+               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [&](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, suffix);
+                           });
     }
 
     bool ToolProbe::hasUcrtLib(const ToolchainProfile &profile)
     {
         const auto suffix = "/ucrt/" + StringUtils::toLower(profile.targetArch);
-        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [](const auto &dir)
-                           { return ToolProbe::hasPart(dir, "/windows kits/10/lib/"); }) &&
-               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [&](const auto &dir)
-                           { return ToolProbe::hasPart(dir, suffix); });
+        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, "/windows kits/10/lib/");
+                           }) &&
+               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [&](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, suffix);
+                           });
     }
 
     bool ToolProbe::hasUmLib(const ToolchainProfile &profile)
     {
         const auto suffix = "/um/" + StringUtils::toLower(profile.targetArch);
-        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [](const auto &dir)
-                           { return ToolProbe::hasPart(dir, "/windows kits/10/lib/"); }) &&
-               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(), [&](const auto &dir)
-                           { return ToolProbe::hasPart(dir, suffix); });
+        return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, "/windows kits/10/lib/");
+                           }) &&
+               std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
+                           [&](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, suffix);
+                           });
     }
 
     bool ToolProbe::hasInclude(const ToolchainProfile &profile, const std::string &part)
     {
-        return std::any_of(profile.systemIncludeDirs.begin(), profile.systemIncludeDirs.end(), [&](const auto &dir)
-                           { return ToolProbe::hasPart(dir, part); });
+        return std::any_of(profile.systemIncludeDirs.begin(), profile.systemIncludeDirs.end(),
+                           [&](const auto &dir)
+                           {
+                               return ToolProbe::hasPart(dir, part);
+                           });
     }
 
-    void ToolProbe::complete(ToolchainProfile &profile)
+    void ToolProbe::androidTools(const ToolchainProfile &profile, std::vector<std::string> &requiredMissing,
+                                 std::vector<std::string> &optionalMissing)
     {
-        profile.missing.clear();
-        const bool usesSdkSysroot = profile.sdkKind == "macosx" ||
-                                    profile.sdkKind == "iphoneos" ||
-                                    profile.sdkKind == "iphonesimulator" ||
-                                    profile.sdkKind == "android-ndk";
-        if (profile.sdkKind == "android-ndk")
+        if (profile.compiler.empty() || !File::exists(profile.compiler))
         {
-            std::vector<std::string> requiredMissing;
-            std::vector<std::string> optionalMissing;
-            const auto prebuilt = ToolProbe::androidPrebuilt(profile.androidNdkRoot);
-            const auto sysroot = profile.sysroot.empty() ? (prebuilt.empty() ? std::filesystem::path{} : prebuilt / "sysroot") : profile.sysroot;
-
-            if (profile.androidSdkRoot.empty() || !std::filesystem::is_directory(profile.androidSdkRoot))
-            {
-                requiredMissing.push_back("android_sdk");
-            }
-            if (profile.androidNdkRoot.empty() || !std::filesystem::is_directory(profile.androidNdkRoot))
-            {
-                requiredMissing.push_back("android_ndk");
-            }
-            if (prebuilt.empty() || !std::filesystem::is_directory(prebuilt / "bin"))
-            {
-                requiredMissing.push_back("android_prebuilt_bin");
-            }
-            if (sysroot.empty() || !std::filesystem::is_directory(sysroot))
-            {
-                requiredMissing.push_back("android_sysroot");
-            }
-            if (!ToolProbe::intAtLeast(profile.androidApi, 1))
-            {
-                requiredMissing.push_back("android_api");
-            }
-            if (profile.androidAbi.empty())
-            {
-                requiredMissing.push_back("android_abi");
-            }
-            if (profile.targetTriple.empty())
-            {
-                requiredMissing.push_back("target_triple");
-            }
-            if (profile.compiler.empty() || !File::exists(profile.compiler))
-            {
-                requiredMissing.push_back("android_clang");
-            }
-            if (profile.cxxCompiler.empty() || !File::exists(profile.cxxCompiler))
-            {
-                requiredMissing.push_back("android_clangxx");
-            }
-            if (profile.archiver.empty() || !File::exists(profile.archiver))
-            {
-                requiredMissing.push_back("android_llvm_ar");
-            }
-            if (profile.linker.empty() || !File::exists(profile.linker))
-            {
-                requiredMissing.push_back("linker");
-            }
-            if (profile.adb.empty() || !File::exists(profile.adb))
-            {
-                optionalMissing.push_back("optional:adb");
-            }
-            if (profile.java.empty() || !File::exists(profile.java))
-            {
-                optionalMissing.push_back("optional:java");
-            }
-            if (profile.javac.empty() || !File::exists(profile.javac))
-            {
-                optionalMissing.push_back("optional:javac");
-            }
-            if (profile.gradle.empty() || !File::exists(profile.gradle))
-            {
-                optionalMissing.push_back("optional:gradle");
-            }
-            profile.missing = requiredMissing;
-            profile.missing.insert(profile.missing.end(), optionalMissing.begin(), optionalMissing.end());
-            profile.complete = requiredMissing.empty();
-            return;
+            requiredMissing.push_back("android_clang");
         }
+        if (profile.cxxCompiler.empty() || !File::exists(profile.cxxCompiler))
+        {
+            requiredMissing.push_back("android_clangxx");
+        }
+        if (profile.archiver.empty() || !File::exists(profile.archiver))
+        {
+            requiredMissing.push_back("android_llvm_ar");
+        }
+        if (profile.linker.empty() || !File::exists(profile.linker))
+        {
+            requiredMissing.push_back("linker");
+        }
+        if (profile.adb.empty() || !File::exists(profile.adb))
+        {
+            optionalMissing.push_back("optional:adb");
+        }
+        if (profile.java.empty() || !File::exists(profile.java))
+        {
+            optionalMissing.push_back("optional:java");
+        }
+        if (profile.javac.empty() || !File::exists(profile.javac))
+        {
+            optionalMissing.push_back("optional:javac");
+        }
+        if (profile.gradle.empty() || !File::exists(profile.gradle))
+        {
+            optionalMissing.push_back("optional:gradle");
+        }
+    }
+
+    void ToolProbe::completeAndroid(ToolchainProfile &profile)
+    {
+        std::vector<std::string> requiredMissing;
+        std::vector<std::string> optionalMissing;
+        const auto prebuilt = ToolProbe::androidPrebuilt(profile.androidNdkRoot);
+        const auto sysroot = profile.sysroot.empty()
+                                 ? (prebuilt.empty() ? std::filesystem::path{} : prebuilt / "sysroot")
+                                 : profile.sysroot;
+
+        if (profile.androidSdkRoot.empty() || !std::filesystem::is_directory(profile.androidSdkRoot))
+        {
+            requiredMissing.push_back("android_sdk");
+        }
+        if (profile.androidNdkRoot.empty() || !std::filesystem::is_directory(profile.androidNdkRoot))
+        {
+            requiredMissing.push_back("android_ndk");
+        }
+        if (prebuilt.empty() || !std::filesystem::is_directory(prebuilt / "bin"))
+        {
+            requiredMissing.push_back("android_prebuilt_bin");
+        }
+        if (sysroot.empty() || !std::filesystem::is_directory(sysroot))
+        {
+            requiredMissing.push_back("android_sysroot");
+        }
+        if (!ToolProbe::intAtLeast(profile.androidApi, 1))
+        {
+            requiredMissing.push_back("android_api");
+        }
+        if (profile.androidAbi.empty())
+        {
+            requiredMissing.push_back("android_abi");
+        }
+        if (profile.targetTriple.empty())
+        {
+            requiredMissing.push_back("target_triple");
+        }
+        androidTools(profile, requiredMissing, optionalMissing);
+        profile.missing = requiredMissing;
+        profile.missing.insert(profile.missing.end(), optionalMissing.begin(), optionalMissing.end());
+        profile.complete = requiredMissing.empty();
+    }
+
+    void ToolProbe::completeDesktop(ToolchainProfile &profile, bool usesSdkSysroot)
+    {
         if (!File::exists(profile.compiler) && !File::exists(profile.cxxCompiler))
         {
             profile.missing.push_back("compiler");
@@ -543,23 +581,31 @@ namespace rhodium
         {
             profile.missing.push_back("sdk_root");
         }
+    }
+
+    void ToolProbe::completeWindows(ToolchainProfile &profile)
+    {
         if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && profile.sdkKind != "windows-sdk")
         {
             profile.missing.push_back("windows_sdk");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (profile.compiler.empty() || !File::exists(profile.compiler)))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (profile.compiler.empty() || !File::exists(profile.compiler)))
         {
             profile.missing.push_back("msvc_cl");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (profile.linker.empty() || !File::exists(profile.linker)))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (profile.linker.empty() || !File::exists(profile.linker)))
         {
             profile.missing.push_back("msvc_link");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (profile.archiver.empty() || !File::exists(profile.archiver)))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (profile.archiver.empty() || !File::exists(profile.archiver)))
         {
             profile.missing.push_back("msvc_lib");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && !ToolProbe::hasInclude(profile, "/vc/tools/msvc/"))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            !ToolProbe::hasInclude(profile, "/vc/tools/msvc/"))
         {
             profile.missing.push_back("msvc_include");
         }
@@ -567,15 +613,18 @@ namespace rhodium
         {
             profile.missing.push_back("msvc_lib_" + profile.targetArch);
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && !ToolProbe::hasInclude(profile, "/ucrt"))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            !ToolProbe::hasInclude(profile, "/ucrt"))
         {
             profile.missing.push_back("windows_sdk_ucrt_include");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && !ToolProbe::hasInclude(profile, "/um"))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            !ToolProbe::hasInclude(profile, "/um"))
         {
             profile.missing.push_back("windows_sdk_um_include");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && !ToolProbe::hasInclude(profile, "/shared"))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            !ToolProbe::hasInclude(profile, "/shared"))
         {
             profile.missing.push_back("windows_sdk_shared_include");
         }
@@ -588,32 +637,50 @@ namespace rhodium
             profile.missing.push_back("windows_sdk_um_lib_" + profile.targetArch);
         }
         auto includeEnv = profile.environment.find("INCLUDE");
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (includeEnv == profile.environment.end() || includeEnv->second.empty()))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (includeEnv == profile.environment.end() || includeEnv->second.empty()))
         {
             profile.missing.push_back("environment_INCLUDE");
         }
         auto libEnv = profile.environment.find("LIB");
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (libEnv == profile.environment.end() || libEnv->second.empty()))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (libEnv == profile.environment.end() || libEnv->second.empty()))
         {
             profile.missing.push_back("environment_LIB");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (profile.resourceCompiler.empty() || !File::exists(profile.resourceCompiler)))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (profile.resourceCompiler.empty() || !File::exists(profile.resourceCompiler)))
         {
             profile.missing.push_back("rc");
         }
-        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") && (profile.manifestTool.empty() || !File::exists(profile.manifestTool)))
+        if ((profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl") &&
+            (profile.manifestTool.empty() || !File::exists(profile.manifestTool)))
         {
             profile.missing.push_back("mt");
         }
+    }
+
+    void ToolProbe::complete(ToolchainProfile &profile)
+    {
+        profile.missing.clear();
+        const bool usesSdkSysroot = profile.sdkKind == "macosx" || profile.sdkKind == "iphoneos" ||
+                                    profile.sdkKind == "iphonesimulator" || profile.sdkKind == "android-ndk";
+        if (profile.sdkKind == "android-ndk")
+        {
+            completeAndroid(profile);
+            return;
+        }
+        completeDesktop(profile, usesSdkSysroot);
+        completeWindows(profile);
         profile.complete = profile.missing.empty();
     }
 
-    std::filesystem::path findToolInDir(const std::filesystem::path &dir, const std::string &baseName)
+    std::filesystem::path ToolchainDetector::findTool(const std::filesystem::path &dir, const std::string &baseName)
     {
         return ToolProbe::inDir(dir, baseName);
     }
 
-    std::filesystem::path findExecutableOnPath(const std::string &name)
+    std::filesystem::path ToolchainDetector::findExecutable(const std::string &name)
     {
         const auto executable = ToolProbe::exe(name);
         auto direct = std::filesystem::path(name);

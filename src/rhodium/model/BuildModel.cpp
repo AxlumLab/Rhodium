@@ -19,46 +19,175 @@ namespace rhodium
 {
     namespace
     {
-        bool isBlank(const std::string &value)
+        class ModelFields final
         {
-            return std::all_of(value.begin(), value.end(), [](unsigned char c)
-                               { return std::isspace(c) != 0; });
-        }
-
-        bool isOneOf(const std::string &value, std::initializer_list<const char *> allowed)
-        {
-            const auto normalized = StringUtils::toLower(value);
-            for (const char *item : allowed)
+        public:
+            static bool blank(const std::string &value)
             {
-                if (normalized == item)
+                return std::all_of(value.begin(), value.end(),
+                                   [](unsigned char c)
+                                   {
+                                       return std::isspace(c) != 0;
+                                   });
+            }
+
+            static bool oneOf(const std::string &value, std::initializer_list<const char *> allowed)
+            {
+                const auto normalized = StringUtils::toLower(value);
+                for (const char *item : allowed)
                 {
-                    return true;
+                    if (normalized == item)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            static void strings(const std::vector<std::string> &values, const std::string &field,
+                                DiagnosticSink &diagnostics, bool &ok)
+            {
+                for (const auto &value : values)
+                {
+                    if (ModelFields::blank(value))
+                    {
+                        diagnostics.error(field + " contains an empty path/value");
+                        ok = false;
+                    }
                 }
             }
-            return false;
-        }
+        };
 
-        void validateStringList(const std::vector<std::string> &values,
-                                const std::string &field,
-                                DiagnosticSink &diagnostics,
-                                bool &ok)
-        {
-            for (const auto &value : values)
-            {
-                if (isBlank(value))
-                {
-                    diagnostics.error(field + " contains an empty path/value");
-                    ok = false;
-                }
-            }
-        }
     }
 
-    bool validateBuildModel(const BuildModel &model, DiagnosticSink &diagnostics)
+    namespace
+    {
+        class DependencyValidation final
+        {
+        public:
+            static bool validate(const DependencyDesc &dependency, std::set<std::string> &dependencyNames,
+                                 DiagnosticSink &diagnostics)
+            {
+
+                bool ok = true;
+                if (ModelFields::blank(dependency.name))
+                {
+                    diagnostics.error("require dependency is missing name");
+                    ok = false;
+                }
+                else if (!dependencyNames.insert(dependency.name).second)
+                {
+                    diagnostics.error("duplicate dependency name: " + dependency.name);
+                    ok = false;
+                }
+
+                ok &= source(dependency, diagnostics);
+                ok &= options(dependency, diagnostics);
+                ok &= artifacts(dependency, diagnostics);
+                return ok;
+            }
+
+            static bool source(const DependencyDesc &dependency, DiagnosticSink &diagnostics)
+            {
+                bool ok = true;
+                if (dependency.sourceType == "git" && dependency.buildType != "header_only" &&
+                    ModelFields::blank(dependency.ref))
+                {
+                    diagnostics.error("require dependency " + dependency.source + " is missing ref");
+                    ok = false;
+                }
+                if (ModelFields::blank(dependency.source))
+                {
+                    diagnostics.error("dependency source/path is empty");
+                    ok = false;
+                }
+                if (!ModelFields::oneOf(dependency.sourceType, {"git", "local", "archive"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid source type " +
+                                      dependency.sourceType);
+                    ok = false;
+                }
+                if (dependency.stripComponents < 0)
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid strip_components");
+                    ok = false;
+                }
+
+                return ok;
+            }
+
+            static bool options(const DependencyDesc &dependency, DiagnosticSink &diagnostics)
+            {
+                bool ok = true;
+                if (!ModelFields::oneOf(dependency.buildType,
+                                        {"cmake", "make", "configure_make", "custom", "header_only", "prebuilt"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid build type " +
+                                      dependency.buildType);
+                    ok = false;
+                }
+                if (!ModelFields::oneOf(dependency.linkage, {"default", "static", "shared"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid linkage " + dependency.linkage);
+                    ok = false;
+                }
+                if (!ModelFields::oneOf(dependency.runtime, {"default", "static", "dynamic"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid runtime " + dependency.runtime);
+                    ok = false;
+                }
+                if (!ModelFields::oneOf(dependency.pic, {"default", "true", "false"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid pic " + dependency.pic);
+                    ok = false;
+                }
+
+                return ok;
+            }
+
+            static bool artifacts(const DependencyDesc &dependency, DiagnosticSink &diagnostics)
+            {
+                bool ok = true;
+                if (!ModelFields::oneOf(dependency.artifacts.mode, {"install", "copy", "export"}))
+                {
+                    diagnostics.error("dependency " + dependency.name + " has invalid artifact mode " +
+                                      dependency.artifacts.mode);
+                    ok = false;
+                }
+                ModelFields::strings(dependency.artifacts.includeDirs,
+                                     "dependency " + dependency.name + " artifact includes", diagnostics, ok);
+                ModelFields::strings(dependency.artifacts.libDirs,
+                                     "dependency " + dependency.name + " artifact lib_dirs", diagnostics, ok);
+                ModelFields::strings(dependency.artifacts.binDirs,
+                                     "dependency " + dependency.name + " artifact bin_dirs", diagnostics, ok);
+                ModelFields::strings(dependency.artifacts.binFiles,
+                                     "dependency " + dependency.name + " artifact bin_files", diagnostics, ok);
+                ModelFields::strings(dependency.artifacts.libs, "dependency " + dependency.name + " artifact libs",
+                                     diagnostics, ok);
+                ModelFields::strings(dependency.artifacts.libFiles,
+                                     "dependency " + dependency.name + " artifact lib_files", diagnostics, ok);
+                for (const auto &[config, files] : dependency.artifacts.libFilesByConfig)
+                {
+                    if (!ModelFields::oneOf(config, {"debug", "release", "all"}))
+                    {
+                        diagnostics.error("dependency " + dependency.name + " artifact lib_files has invalid config " +
+                                          config);
+                        ok = false;
+                    }
+                    ModelFields::strings(files, "dependency " + dependency.name + " artifact lib_files." + config,
+                                         diagnostics, ok);
+                }
+
+                return ok;
+            }
+        };
+    }
+
+    bool ModelValidator::validate(const BuildModel &model, DiagnosticSink &diagnostics)
     {
         bool ok = true;
 
-        if (isBlank(model.rootPackage.name))
+        if (ModelFields::blank(model.rootPackage.name))
         {
             diagnostics.error("package name is empty");
             ok = false;
@@ -67,77 +196,7 @@ namespace rhodium
         std::set<std::string> dependencyNames;
         for (const auto &dependency : model.rootPackage.dependencies)
         {
-            if (isBlank(dependency.name))
-            {
-                diagnostics.error("require dependency is missing name");
-                ok = false;
-            }
-            else if (!dependencyNames.insert(dependency.name).second)
-            {
-                diagnostics.error("duplicate dependency name: " + dependency.name);
-                ok = false;
-            }
-
-            if (dependency.sourceType == "git" && dependency.buildType != "header_only" && isBlank(dependency.ref))
-            {
-                diagnostics.error("require dependency " + dependency.source + " is missing ref");
-                ok = false;
-            }
-            if (isBlank(dependency.source))
-            {
-                diagnostics.error("dependency source/path is empty");
-                ok = false;
-            }
-            if (!isOneOf(dependency.sourceType, {"git", "local", "archive"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid source type " + dependency.sourceType);
-                ok = false;
-            }
-            if (dependency.stripComponents < 0)
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid strip_components");
-                ok = false;
-            }
-            if (!isOneOf(dependency.buildType, {"cmake", "make", "configure_make", "custom", "header_only", "prebuilt"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid build type " + dependency.buildType);
-                ok = false;
-            }
-            if (!isOneOf(dependency.linkage, {"default", "static", "shared"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid linkage " + dependency.linkage);
-                ok = false;
-            }
-            if (!isOneOf(dependency.runtime, {"default", "static", "dynamic"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid runtime " + dependency.runtime);
-                ok = false;
-            }
-            if (!isOneOf(dependency.pic, {"default", "true", "false"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid pic " + dependency.pic);
-                ok = false;
-            }
-            if (!isOneOf(dependency.artifacts.mode, {"install", "copy", "export"}))
-            {
-                diagnostics.error("dependency " + dependency.name + " has invalid artifact mode " + dependency.artifacts.mode);
-                ok = false;
-            }
-            validateStringList(dependency.artifacts.includeDirs, "dependency " + dependency.name + " artifact includes", diagnostics, ok);
-            validateStringList(dependency.artifacts.libDirs, "dependency " + dependency.name + " artifact lib_dirs", diagnostics, ok);
-            validateStringList(dependency.artifacts.binDirs, "dependency " + dependency.name + " artifact bin_dirs", diagnostics, ok);
-            validateStringList(dependency.artifacts.binFiles, "dependency " + dependency.name + " artifact bin_files", diagnostics, ok);
-            validateStringList(dependency.artifacts.libs, "dependency " + dependency.name + " artifact libs", diagnostics, ok);
-            validateStringList(dependency.artifacts.libFiles, "dependency " + dependency.name + " artifact lib_files", diagnostics, ok);
-            for (const auto &[config, files] : dependency.artifacts.libFilesByConfig)
-            {
-                if (!isOneOf(config, {"debug", "release", "all"}))
-                {
-                    diagnostics.error("dependency " + dependency.name + " artifact lib_files has invalid config " + config);
-                    ok = false;
-                }
-                validateStringList(files, "dependency " + dependency.name + " artifact lib_files." + config, diagnostics, ok);
-            }
+            ok &= DependencyValidation::validate(dependency, dependencyNames, diagnostics);
         }
 
         return ok;

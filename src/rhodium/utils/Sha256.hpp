@@ -11,6 +11,11 @@
 
 namespace rhodium
 {
-    std::string sha256File(const std::filesystem::path &path, std::string *error = nullptr);
-    bool sha256Equals(const std::string &left, const std::string &right);
+    class Sha256
+    {
+    public:
+        static std::string file(const std::filesystem::path &path, std::string *error = nullptr);
+        static bool equal(const std::string &left, const std::string &right);
+    };
+
 }

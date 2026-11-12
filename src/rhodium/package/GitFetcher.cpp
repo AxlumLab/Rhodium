@@ -41,10 +41,14 @@ namespace rhodium
         static std::string redact(const std::string &url);
         static void proxy(git_fetch_options &options, std::string &proxyUrl, DiagnosticSink &diagnostics);
         static std::string url(const std::string &source);
-        static bool open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, DiagnosticSink &diagnostics);
+        static bool clone(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                          git_repository **repo, DiagnosticSink &diagnostics);
+        static bool open(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                         git_repository **repo, DiagnosticSink &diagnostics);
         static bool fetch(git_repository *repo, const std::string &packageName, DiagnosticSink &diagnostics);
         static bool resolve(git_repository *repo, const std::string &ref, git_object **object);
-        static bool checkout(git_repository *repo, git_object *object, std::string &commit, DiagnosticSink &diagnostics);
+        static bool checkout(git_repository *repo, git_object *object, std::string &commit,
+                             DiagnosticSink &diagnostics);
         static bool submodules(git_repository *repo, const std::string &packageName, DiagnosticSink &diagnostics);
     };
 
@@ -102,7 +106,8 @@ namespace rhodium
             return 0;
         }
 
-        const int percent = static_cast<int>((static_cast<std::size_t>(stats->received_objects) * 100) / stats->total_objects);
+        const int percent =
+            static_cast<int>((static_cast<std::size_t>(stats->received_objects) * 100) / stats->total_objects);
 
         if (percent != state->lastPercent)
         {
@@ -148,12 +153,7 @@ namespace rhodium
     std::string GitFetch::proxyEnv()
     {
         const char *keys[] = {
-            "HTTPS_PROXY",
-            "https_proxy",
-            "HTTP_PROXY",
-            "http_proxy",
-            "ALL_PROXY",
-            "all_proxy",
+            "HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy",
         };
         for (const char *key : keys)
         {
@@ -198,11 +198,8 @@ namespace rhodium
 
     std::string GitFetch::url(const std::string &source)
     {
-        if (source.rfind("http://", 0) == 0 ||
-            source.rfind("https://", 0) == 0 ||
-            source.rfind("file://", 0) == 0 ||
-            source.rfind("git@", 0) == 0 ||
-            source.rfind("ssh://", 0) == 0)
+        if (source.rfind("http://", 0) == 0 || source.rfind("https://", 0) == 0 || source.rfind("file://", 0) == 0 ||
+            source.rfind("git@", 0) == 0 || source.rfind("ssh://", 0) == 0)
         {
             return source;
         }
@@ -217,19 +214,9 @@ namespace rhodium
         return source;
     }
 
-    bool GitFetch::open(const DependencyDesc &dependency, const std::filesystem::path &destination, git_repository **repo, DiagnosticSink &diagnostics)
+    bool GitFetch::clone(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                         git_repository **repo, DiagnosticSink &diagnostics)
     {
-        const auto gitDir = destination / ".git";
-        if (File::dir(gitDir))
-        {
-            if (git_repository_open(repo, destination.string().c_str()) != 0)
-            {
-                diagnostics.error(error("failed to open git package cache"));
-                return false;
-            }
-            return true;
-        }
-
         std::string mkdirError;
         if (!File::mkdir(destination.parent_path(), &mkdirError))
         {
@@ -264,7 +251,8 @@ namespace rhodium
 
             if (i == 0)
             {
-                diagnostics.info("cloning package " + dependency.name + " from " + url + " into " + destination.string());
+                diagnostics.info("cloning package " + dependency.name + " from " + url + " into " +
+                                 destination.string());
             }
             else
             {
@@ -304,8 +292,26 @@ namespace rhodium
         }
 
         // All attempts failed
-        diagnostics.error(error("failed to clone " + dependency.source + " (tried " + std::to_string(urlsToTry.size()) + " URL(s))"));
+        diagnostics.error(
+            error("failed to clone " + dependency.source + " (tried " + std::to_string(urlsToTry.size()) + " URL(s))"));
         return false;
+    }
+
+    bool GitFetch::open(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                        git_repository **repo, DiagnosticSink &diagnostics)
+    {
+        const auto gitDir = destination / ".git";
+        if (File::dir(gitDir))
+        {
+            if (git_repository_open(repo, destination.string().c_str()) != 0)
+            {
+                diagnostics.error(error("failed to open git package cache"));
+                return false;
+            }
+            return true;
+        }
+
+        return clone(dependency, destination, repo, diagnostics);
     }
 
     bool GitFetch::fetch(git_repository *repo, const std::string &packageName, DiagnosticSink &diagnostics)
@@ -410,26 +416,32 @@ namespace rhodium
             std::string *proxyUrl;
             int count;
         };
+
         std::string proxyUrl = proxyEnv();
         Payload payload = {&diagnostics, &proxyUrl, 0};
 
-        git_submodule_foreach(repo, [](git_submodule *sm, const char *name, void *payload) -> int {
-            auto *ctx = static_cast<Payload *>(payload);
-            ctx->count++;
-            git_submodule_init(sm, 0);
-            git_submodule_update_options opts = GIT_SUBMODULE_UPDATE_OPTIONS_INIT;
-            if (!ctx->proxyUrl->empty())
+        git_submodule_foreach(
+            repo,
+            [](git_submodule *sm, const char *name, void *payload) -> int
             {
-                opts.fetch_opts.proxy_opts.type = GIT_PROXY_SPECIFIED;
-                opts.fetch_opts.proxy_opts.url = ctx->proxyUrl->c_str();
-            }
-            if (git_submodule_update(sm, 1, &opts) != 0)
-            {
-                const git_error *e = git_error_last();
-                ctx->diagnostics->warning(std::string("failed to update submodule ") + name + ": " + (e && e->message ? e->message : "unknown error"));
-            }
-            return 0;
-        }, &payload);
+                auto *ctx = static_cast<Payload *>(payload);
+                ctx->count++;
+                git_submodule_init(sm, 0);
+                git_submodule_update_options opts = GIT_SUBMODULE_UPDATE_OPTIONS_INIT;
+                if (!ctx->proxyUrl->empty())
+                {
+                    opts.fetch_opts.proxy_opts.type = GIT_PROXY_SPECIFIED;
+                    opts.fetch_opts.proxy_opts.url = ctx->proxyUrl->c_str();
+                }
+                if (git_submodule_update(sm, 1, &opts) != 0)
+                {
+                    const git_error *e = git_error_last();
+                    ctx->diagnostics->warning(std::string("failed to update submodule ") + name + ": " +
+                                              (e && e->message ? e->message : "unknown error"));
+                }
+                return 0;
+            },
+            &payload);
 
         if (payload.count > 0)
         {
@@ -450,13 +462,15 @@ namespace rhodium
         return true;
     }
 
-    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, DiagnosticSink &diagnostics) const
+    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                           DiagnosticSink &diagnostics) const
     {
         std::string commit;
         return fetch(dependency, destination, commit, diagnostics);
     }
 
-    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, std::string &commit, DiagnosticSink &diagnostics) const
+    bool GitFetcher::fetch(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                           std::string &commit, DiagnosticSink &diagnostics) const
     {
         git_libgit2_init();
         git_repository *repo = nullptr;

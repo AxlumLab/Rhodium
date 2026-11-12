@@ -15,10 +15,8 @@
 namespace rhodium
 {
 
-    bool PrebuiltPackageBuilder::dirs(const std::filesystem::path &root,
-                                      const std::vector<std::string> &dirs,
-                                      const std::string &field,
-                                      DiagnosticSink &diagnostics)
+    bool PrebuiltPackageBuilder::dirs(const std::filesystem::path &root, const std::vector<std::string> &dirs,
+                                      const std::string &field, DiagnosticSink &diagnostics)
     {
         for (const auto &dir : dirs)
         {
@@ -32,18 +30,11 @@ namespace rhodium
         return true;
     }
 
-    bool PrebuiltPackageBuilder::build(const DependencyDesc &dependency,
-                                       const std::filesystem::path &sourceDir,
-                                       const std::filesystem::path &,
-                                       const std::filesystem::path &artifactDir,
-                                       const std::string &commit,
-                                       const std::filesystem::path &workspaceRoot,
-                                       const std::string &preferredToolchain,
-                                       const std::string &config,
-                                       const PackageBuildOptions &options,
-                                       PackageArtifact &artifact,
+    bool PrebuiltPackageBuilder::build(const PackageBuildRequest &request, PackageArtifact &artifact,
                                        DiagnosticSink &diagnostics) const
     {
+        const auto &[dependency, sourceDir, buildDir, artifactDir, commit, workspaceRoot, preferredToolchain, config,
+                     options] = request;
         (void)preferredToolchain;
         if (!options.runExport)
         {

@@ -8,7 +8,7 @@
 
 namespace rhodium
 {
-    const char *toString(DiagnosticLevel level)
+    const char *Diagnostic::name(DiagnosticLevel level)
     {
         switch (level)
         {

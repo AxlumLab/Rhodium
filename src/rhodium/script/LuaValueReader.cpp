@@ -13,7 +13,7 @@
 namespace rhodium
 {
 
-    std::string getStringOr(sol::table table, const char *key, const std::string &fallback)
+    std::string LuaValueReader::string(sol::table table, const char *key, const std::string &fallback)
     {
         sol::object value = table[key];
         if (value.is<std::string>())
@@ -23,7 +23,7 @@ namespace rhodium
         return fallback;
     }
 
-    bool getBoolOr(sol::table table, const char *key, bool fallback)
+    bool LuaValueReader::boolean(sol::table table, const char *key, bool fallback)
     {
         sol::object value = table[key];
         if (value.is<bool>())
@@ -33,7 +33,7 @@ namespace rhodium
         return fallback;
     }
 
-    int getIntOr(sol::table table, const char *key, int fallback)
+    int LuaValueReader::integer(sol::table table, const char *key, int fallback)
     {
         sol::object value = table[key];
         if (value.is<int>())
@@ -43,12 +43,12 @@ namespace rhodium
         return fallback;
     }
 
-    bool hasField(sol::table table, const char *key)
+    bool LuaValueReader::has(sol::table table, const char *key)
     {
         return !table[key].is<sol::nil_t>();
     }
 
-    std::string objectToString(sol::object value)
+    std::string LuaValueReader::text(sol::object value)
     {
         if (value.is<std::string>())
         {
@@ -71,7 +71,7 @@ namespace rhodium
         return {};
     }
 
-    std::vector<std::string> getStringArrayFromValue(sol::object value)
+    std::vector<std::string> LuaValueReader::strings(sol::object value)
     {
         std::vector<std::string> values;
         if (!value.is<sol::table>())
@@ -89,12 +89,12 @@ namespace rhodium
         return values;
     }
 
-    std::vector<std::string> getStringArrayOr(sol::table table, const char *key)
+    std::vector<std::string> LuaValueReader::array(sol::table table, const char *key)
     {
-        return getStringArrayFromValue(table[key]);
+        return LuaValueReader::strings(table[key]);
     }
 
-    std::map<std::string, std::string> getStringMapOr(sol::table table, const char *key)
+    std::map<std::string, std::string> LuaValueReader::map(sol::table table, const char *key)
     {
         std::map<std::string, std::string> values;
         sol::object value = table[key];
@@ -107,13 +107,13 @@ namespace rhodium
         {
             if (item.first.is<std::string>())
             {
-                values[item.first.as<std::string>()] = objectToString(item.second);
+                values[item.first.as<std::string>()] = LuaValueReader::text(item.second);
             }
         }
         return values;
     }
 
-    std::map<std::string, std::vector<std::string>> getStringArrayMapOr(sol::table table, const char *key)
+    std::map<std::string, std::vector<std::string>> LuaValueReader::arrayMap(sol::table table, const char *key)
     {
         std::map<std::string, std::vector<std::string>> values;
         sol::object value = table[key];
@@ -126,13 +126,13 @@ namespace rhodium
         {
             if (item.first.is<std::string>() && item.second.is<sol::table>())
             {
-                values[StringUtils::toLower(item.first.as<std::string>())] = getStringArrayFromValue(item.second);
+                values[StringUtils::toLower(item.first.as<std::string>())] = LuaValueReader::strings(item.second);
             }
         }
         return values;
     }
 
-    void setStringIfPresent(sol::table table, const char *key, std::string &destination)
+    void LuaValueReader::setString(sol::table table, const char *key, std::string &destination)
     {
         sol::object value = table[key];
         if (value.is<std::string>())
@@ -141,7 +141,7 @@ namespace rhodium
         }
     }
 
-    void setBoolStringIfPresent(sol::table table, const char *key, std::string &destination)
+    void LuaValueReader::setBoolString(sol::table table, const char *key, std::string &destination)
     {
         sol::object value = table[key];
         if (value.is<bool>())
@@ -154,20 +154,18 @@ namespace rhodium
         }
     }
 
-    void setStringArrayIfPresent(sol::table table, const char *key, std::vector<std::string> &destination)
+    void LuaValueReader::setArray(sol::table table, const char *key, std::vector<std::string> &destination)
     {
-        if (hasField(table, key))
+        if (LuaValueReader::has(table, key))
         {
-            destination = getStringArrayOr(table, key);
+            destination = LuaValueReader::array(table, key);
         }
     }
 
-    void setStringArrayOrMapIfPresent(sol::table table,
-                                      const char *key,
-                                      std::vector<std::string> &arrayDestination,
-                                      std::map<std::string, std::vector<std::string>> &mapDestination)
+    void LuaValueReader::setArrayOrMap(sol::table table, const char *key, std::vector<std::string> &arrayDestination,
+                                       std::map<std::string, std::vector<std::string>> &mapDestination)
     {
-        if (!hasField(table, key))
+        if (!LuaValueReader::has(table, key))
         {
             return;
         }
@@ -186,12 +184,12 @@ namespace rhodium
             }
             if (stringArray)
             {
-                arrayDestination = getStringArrayFromValue(value);
+                arrayDestination = LuaValueReader::strings(value);
                 mapDestination.clear();
             }
             else
             {
-                mapDestination = getStringArrayMapOr(table, key);
+                mapDestination = LuaValueReader::arrayMap(table, key);
                 arrayDestination.clear();
             }
         }

@@ -15,131 +15,146 @@
 namespace rhodium
 {
 
-    bool DepFetch::source(DependencyDesc &dependency,
-                          LockedPackage *locked,
-                          bool wantsUpdate,
-                          const Context &context,
-                          Result &result,
-                          DiagnosticSink &diagnostics)
+    bool DepFetch::sourceLocal(const Request &request, const Context &context, Result &result,
+                               DiagnosticSink &diagnostics)
     {
-        result = {};
-        result.commit = dependency.overridden ? "override" : (dependency.sourceType == "local" ? "local" : ((locked && !wantsUpdate) ? locked->commit : ""));
+        const auto &[dependency, locked, wantsUpdate] = request;
 
-        if (dependency.sourceType == "local")
+        result.sourceRoot = local(context.workspaceRoot, dependency);
+        if (!File::dir(result.sourceRoot))
         {
-            result.sourceRoot = local(context.workspaceRoot, dependency);
-            if (!File::dir(result.sourceRoot))
-            {
-                diagnostics.error(std::string(dependency.overridden ? "dependency override path is missing: " : "local dependency source is missing: ") + result.sourceRoot.string());
-                return false;
-            }
-            return true;
+            diagnostics.error(std::string(dependency.overridden ? "dependency override path is missing: "
+                                                                : "local dependency source is missing: ") +
+                              result.sourceRoot.string());
+            return false;
         }
+        return true;
+    }
 
-        if (dependency.sourceType == "archive")
+    bool DepFetch::sourceArchive(const Request &request, const Context &context, Result &result,
+                                 DiagnosticSink &diagnostics)
+    {
+        const auto &[dependency, locked, wantsUpdate] = request;
+
+        ArchiveFetcher archive;
+        ArchiveFetchResult archiveResult;
+        if (!archive.fetchAndExtract(dependency, context.workspaceRoot, context.cache.root(), archiveResult,
+                                     diagnostics))
         {
-            ArchiveFetcher archive;
-            ArchiveFetchResult archiveResult;
-            if (!archive.fetchAndExtract(dependency, context.workspaceRoot, context.cache.root(), archiveResult, diagnostics))
-            {
-                return false;
-            }
-            dependency.resolvedArchiveHash = archiveResult.archiveHash;
-            dependency.patchHashes = archiveResult.patchHashes;
-            result.commit = archiveResult.archiveHash;
-            result.sourceRoot = archiveResult.sourceDir;
-
-            if (locked)
-            {
-                LockedPackage expected = LockedPackage::from(dependency,
-                                                              result.commit,
-                                                              context.effectiveConfig,
-                                                              context.preferredToolchain,
-                                                              context.options.toolchainContentHash);
-                expected.source = DepLock::source(context.workspaceRoot, dependency);
-                if (DepExport::reusable(*locked, expected, Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
-                {
-                    diagnostics.info("package artifact is up to date; skipping archive build: " + dependency.name);
-                    if (!DepExport::gc(context.lockFile,
-                                       context.workspaceRoot,
-                                       context.effectiveConfig,
-                                       context.preferredToolchain,
-                                       dependency.name,
-                                       diagnostics))
-                    {
-                        return false;
-                    }
-                    result.skipPackage = true;
-                }
-            }
-            return true;
+            return false;
         }
+        dependency.resolvedArchiveHash = archiveResult.archiveHash;
+        dependency.patchHashes = archiveResult.patchHashes;
+        result.commit = archiveResult.archiveHash;
+        result.sourceRoot = archiveResult.sourceDir;
 
-        if (dependency.sourceType == "git")
+        if (locked)
         {
-            if (context.options.exportOnly)
+            LockedPackage expected =
+                LockedPackage::from(dependency, result.commit, context.effectiveConfig, context.preferredToolchain,
+                                    context.options.toolchainContentHash);
+            expected.source = DepLock::source(context.workspaceRoot, dependency);
+            if (DepExport::reusable(*locked, expected,
+                                    Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
             {
-                if (!locked || result.commit.empty())
+                diagnostics.info("package artifact is up to date; skipping archive build: " + dependency.name);
+                if (!DepExport::gc(context.lockFile, context.workspaceRoot,
+                                   BuildSelection{context.effectiveConfig, context.preferredToolchain}, dependency.name,
+                                   diagnostics))
                 {
-                    diagnostics.error("restore --export-only requires an existing lock entry for git package " + dependency.name);
                     return false;
                 }
-                result.sourceRoot = context.cache.source(dependency);
-                return true;
+                result.skipPackage = true;
             }
+        }
+        return true;
+    }
 
-            if (locked && !result.commit.empty() && !wantsUpdate)
-            {
-                LockedPackage expected = LockedPackage::from(dependency,
-                                                              result.commit,
-                                                              context.effectiveConfig,
-                                                              context.preferredToolchain,
-                                                              context.options.toolchainContentHash);
-                expected.source = DepLock::source(context.workspaceRoot, dependency);
-                if (DepExport::reusable(*locked, expected, Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
-                {
-                    diagnostics.info("package artifact is up to date; skipping git sync and build: " + dependency.name);
-                    if (!DepExport::gc(context.lockFile,
-                                       context.workspaceRoot,
-                                       context.effectiveConfig,
-                                       context.preferredToolchain,
-                                       dependency.name,
-                                       diagnostics))
-                    {
-                        return false;
-                    }
-                    result.skipPackage = true;
-                    return true;
-                }
-            }
+    bool DepFetch::sourceGit(const Request &request, const Context &context, Result &result,
+                             DiagnosticSink &diagnostics)
+    {
+        const auto &[dependency, locked, wantsUpdate] = request;
 
-            const auto stableSourcePath = context.cache.source(dependency);
-            auto initialPath = stableSourcePath;
-            if (!File::dir(initialPath / ".git"))
+        if (context.options.exportOnly)
+        {
+            if (!locked || result.commit.empty())
             {
-                const auto reusablePath = reusable(context.cache, dependency, initialPath);
-                if (!reusablePath.empty())
-                {
-                    initialPath = reusablePath;
-                    move(initialPath, stableSourcePath, diagnostics);
-                    initialPath = File::dir(stableSourcePath / ".git") ? stableSourcePath : initialPath;
-                    diagnostics.info("reusing package source cache: " + dependency.name + " from " + initialPath.string());
-                }
-            }
-            auto fetchDependency = forGit(context.workspaceRoot, dependency);
-            if (locked && !result.commit.empty())
-            {
-                fetchDependency.ref = result.commit;
-            }
-            if (!context.git.fetch(fetchDependency, initialPath, result.commit, diagnostics))
-            {
+                diagnostics.error("restore --export-only requires an existing lock entry for git package " +
+                                  dependency.name);
                 return false;
             }
-            result.sourceRoot = initialPath;
-            removeSiblings(context.cache, dependency, result.sourceRoot, diagnostics);
+            result.sourceRoot = context.cache.source(dependency);
             return true;
         }
 
+        if (locked && !result.commit.empty() && !wantsUpdate)
+        {
+            LockedPackage expected =
+                LockedPackage::from(dependency, result.commit, context.effectiveConfig, context.preferredToolchain,
+                                    context.options.toolchainContentHash);
+            expected.source = DepLock::source(context.workspaceRoot, dependency);
+            if (DepExport::reusable(*locked, expected,
+                                    Path::stateRoot(context.workspaceRoot) / "artifacts" / expected.artifactId))
+            {
+                diagnostics.info("package artifact is up to date; skipping git sync and build: " + dependency.name);
+                if (!DepExport::gc(context.lockFile, context.workspaceRoot,
+                                   BuildSelection{context.effectiveConfig, context.preferredToolchain}, dependency.name,
+                                   diagnostics))
+                {
+                    return false;
+                }
+                result.skipPackage = true;
+                return true;
+            }
+        }
+
+        const auto stableSourcePath = context.cache.source(dependency);
+        auto initialPath = stableSourcePath;
+        if (!File::dir(initialPath / ".git"))
+        {
+            const auto reusablePath = reusable(context.cache, dependency, initialPath);
+            if (!reusablePath.empty())
+            {
+                initialPath = reusablePath;
+                move(initialPath, stableSourcePath, diagnostics);
+                initialPath = File::dir(stableSourcePath / ".git") ? stableSourcePath : initialPath;
+                diagnostics.info("reusing package source cache: " + dependency.name + " from " + initialPath.string());
+            }
+        }
+        auto fetchDependency = forGit(context.workspaceRoot, dependency);
+        if (locked && !result.commit.empty())
+        {
+            fetchDependency.ref = result.commit;
+        }
+        if (!context.git.fetch(fetchDependency, initialPath, result.commit, diagnostics))
+        {
+            return false;
+        }
+        result.sourceRoot = initialPath;
+        removeSiblings(context.cache, dependency, result.sourceRoot, diagnostics);
+        return true;
+    }
+
+    bool DepFetch::source(const Request &request, const Context &context, Result &result, DiagnosticSink &diagnostics)
+    {
+        const auto &[dependency, locked, wantsUpdate] = request;
+        result = {};
+        result.commit =
+            dependency.overridden
+                ? "override"
+                : (dependency.sourceType == "local" ? "local" : ((locked && !wantsUpdate) ? locked->commit : ""));
+        if (dependency.sourceType == "local")
+        {
+            return sourceLocal(request, context, result, diagnostics);
+        }
+        if (dependency.sourceType == "archive")
+        {
+            return sourceArchive(request, context, result, diagnostics);
+        }
+        if (dependency.sourceType == "git")
+        {
+            return sourceGit(request, context, result, diagnostics);
+        }
         diagnostics.error("unsupported dependency source type: " + dependency.sourceType + " for " + dependency.name);
         return false;
     }
@@ -154,8 +169,7 @@ namespace rhodium
         return path;
     }
 
-    std::filesystem::path DepFetch::reusable(const PackageCache &cache,
-                                             const DependencyDesc &dependency,
+    std::filesystem::path DepFetch::reusable(const PackageCache &cache, const DependencyDesc &dependency,
                                              const std::filesystem::path &preferredPath)
     {
         if (File::dir(preferredPath / ".git"))
@@ -197,9 +211,7 @@ namespace rhodium
         return candidates == 1 ? candidate : std::filesystem::path{};
     }
 
-    void DepFetch::move(const std::filesystem::path &from,
-                        const std::filesystem::path &to,
-                        DiagnosticSink &diagnostics)
+    void DepFetch::move(const std::filesystem::path &from, const std::filesystem::path &to, DiagnosticSink &diagnostics)
     {
         if (from.empty() || from == to || File::dir(to))
         {
@@ -223,10 +235,8 @@ namespace rhodium
         diagnostics.info("moved package source cache to " + to.string());
     }
 
-    void DepFetch::removeSiblings(const PackageCache &cache,
-                                  const DependencyDesc &dependency,
-                                  const std::filesystem::path &keepPath,
-                                  DiagnosticSink &diagnostics)
+    void DepFetch::removeSiblings(const PackageCache &cache, const DependencyDesc &dependency,
+                                  const std::filesystem::path &keepPath, DiagnosticSink &diagnostics)
     {
         const auto sourceRoot = cache.sourceRoot(dependency);
         std::error_code ec;
@@ -255,7 +265,8 @@ namespace rhodium
             std::filesystem::remove_all(path, ec);
             if (ec)
             {
-                diagnostics.warning("failed to remove stale package source cache " + path.string() + ": " + ec.message());
+                diagnostics.warning("failed to remove stale package source cache " + path.string() + ": " +
+                                    ec.message());
                 ec.clear();
             }
             else
@@ -267,12 +278,8 @@ namespace rhodium
 
     bool DepFetch::urlLike(const std::string &source)
     {
-        return source.rfind("http://", 0) == 0 ||
-               source.rfind("https://", 0) == 0 ||
-               source.rfind("file://", 0) == 0 ||
-               source.rfind("ssh://", 0) == 0 ||
-               source.rfind("git@", 0) == 0 ||
-               source.rfind("github.com/", 0) == 0;
+        return source.rfind("http://", 0) == 0 || source.rfind("https://", 0) == 0 || source.rfind("file://", 0) == 0 ||
+               source.rfind("ssh://", 0) == 0 || source.rfind("git@", 0) == 0 || source.rfind("github.com/", 0) == 0;
     }
 
     DependencyDesc DepFetch::forGit(const std::filesystem::path &workspaceRoot, const DependencyDesc &dependency)

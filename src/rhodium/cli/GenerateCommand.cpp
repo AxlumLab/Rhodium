@@ -15,97 +15,107 @@
 
 namespace rhodium
 {
-    bool loadRestoredPackagesForCommand(const std::filesystem::path &workspaceRoot,
-                                        const std::string &toolchainId,
-                                        const std::string &configOption,
-                                        std::vector<ResolvedDependencyArtifact> &packages,
-                                        CMakeDependencyExportMetadata *metadata,
-                                        ConsoleDiagnosticSink &diagnostics,
-                                        const std::vector<std::string> &cliOverrides,
-                                        BuildModel *loadedModel)
+    namespace
     {
-        BuildModel model;
-        if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
+        class RestoredPackages final
         {
-            return false;
-        }
-        const auto config = resolveCommandConfigWithState(model, workspaceRoot, configOption, diagnostics);
-        if (config.empty())
-        {
-            return false;
-        }
-        const auto effectiveToolchain = preferredToolchainForCommand(workspaceRoot, toolchainId, diagnostics);
-        if (effectiveToolchain.empty())
-        {
-            return false;
-        }
-        ToolchainProfile selectedToolchain;
-        if (!selectToolchainForRestore(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
-        {
-            return false;
-        }
-
-        DependencyOverrideSet overrides;
-        if (!loadEffectiveDependencyOverrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
-        {
-            return false;
-        }
-
-        LockFile lockFile;
-        if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
-        {
-            return false;
-        }
-        if (!model.rootPackage.dependencies.empty() && lockFile.packages.empty())
-        {
-            diagnostics.error(dependenciesNotRestoredMessage(config, selectedToolchain.id));
-            return false;
-        }
-
-        PackageArtifactResolver packageResolver;
-        if (!packageResolver.load(lockFile, workspaceRoot, config, selectedToolchain.id, overrides, diagnostics))
-        {
-            return false;
-        }
-        for (const auto &dependency : model.rootPackage.dependencies)
-        {
-            if (!packageResolver.find(dependency.name))
+        public:
+            struct Request
             {
-                diagnostics.error(dependenciesNotRestoredMessage(config, selectedToolchain.id));
-                return false;
+                const std::filesystem::path &workspaceRoot;
+                const std::string &toolchainId;
+                const std::string &configOption;
+                const std::vector<std::string> &cliOverrides;
+            };
+
+            struct Result
+            {
+                std::vector<ResolvedDependencyArtifact> packages;
+                CMakeDependencyExportMetadata metadata;
+                BuildModel model;
+            };
+
+            static bool load(const Request &request, Result &result, ConsoleDiagnosticSink &diagnostics)
+            {
+                const auto &[workspaceRoot, toolchainId, configOption, cliOverrides] = request;
+                BuildModel model;
+                if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
+                {
+                    return false;
+                }
+                const auto config = CliWorkspace::config(model, configOption, diagnostics);
+                if (config.empty())
+                {
+                    return false;
+                }
+                const auto effectiveToolchain = CliWorkspace::toolchain(workspaceRoot, toolchainId, diagnostics);
+                if (effectiveToolchain.empty())
+                {
+                    return false;
+                }
+                ToolchainProfile selectedToolchain;
+                if (!CliWorkspace::selectToolchain(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
+                {
+                    return false;
+                }
+
+                DependencyOverrideSet overrides;
+                if (!CliWorkspace::overrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
+                {
+                    return false;
+                }
+
+                LockFile lockFile;
+                if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
+                {
+                    return false;
+                }
+                if (!model.rootPackage.dependencies.empty() && lockFile.packages.empty())
+                {
+                    diagnostics.error(CliWorkspace::missingDependencies(config, selectedToolchain.id));
+                    return false;
+                }
+
+                PackageArtifactResolver packageResolver;
+                if (!packageResolver.load(lockFile, workspaceRoot, BuildSelection{config, selectedToolchain.id},
+                                          overrides, diagnostics))
+                {
+                    return false;
+                }
+                for (const auto &dependency : model.rootPackage.dependencies)
+                {
+                    if (!packageResolver.find(dependency.name))
+                    {
+                        diagnostics.error(CliWorkspace::missingDependencies(config, selectedToolchain.id));
+                        return false;
+                    }
+                }
+                result.packages = packageResolver.packages();
+                result.model = model;
+                {
+                    result.metadata.toolchainId = selectedToolchain.id;
+                    result.metadata.compilerKind = selectedToolchain.compilerKind;
+                    result.metadata.config = config;
+                    result.metadata.arch = selectedToolchain.targetArch;
+                    result.metadata.runtime = CliWorkspace::runtime(lockFile, config, selectedToolchain.id);
+                    result.metadata.linkage = CliWorkspace::linkage(lockFile, config, selectedToolchain.id);
+                }
+                return true;
             }
-        }
-        packages = packageResolver.packages();
-        if (loadedModel)
-        {
-            *loadedModel = model;
-        }
-        if (metadata)
-        {
-            metadata->toolchainId = selectedToolchain.id;
-            metadata->compilerKind = selectedToolchain.compilerKind;
-            metadata->config = config;
-            metadata->arch = selectedToolchain.targetArch;
-            metadata->runtime = inferRuntimeMetadata(lockFile, config, selectedToolchain.id);
-            metadata->linkage = inferLinkageMetadata(lockFile, config, selectedToolchain.id);
-        }
-        return true;
+        };
     }
 
-    int Commands::generate(const std::filesystem::path &workspaceRoot,
-                        const std::string &toolchainId,
-                        const std::string &configOption,
-                        const std::filesystem::path &outputDir,
-                        const std::vector<std::string> &cliOverrides)
+    int Commands::generate(const std::filesystem::path &workspaceRoot, const std::string &toolchainId,
+                           const std::string &configOption, const std::filesystem::path &outputDir,
+                           const std::vector<std::string> &cliOverrides)
     {
         ConsoleDiagnosticSink diagnostics;
-        std::vector<ResolvedDependencyArtifact> packages;
-        CMakeDependencyExportMetadata metadata;
-        BuildModel model;
-        if (!loadRestoredPackagesForCommand(workspaceRoot, toolchainId, configOption, packages, &metadata, diagnostics, cliOverrides, &model))
+        RestoredPackages::Result result;
+        if (!RestoredPackages::load({workspaceRoot, toolchainId, configOption, cliOverrides}, result, diagnostics))
         {
             return 1;
         }
+        const auto &[packages, metadata, model] = result;
         const auto resolvedOutputDir = outputDir.empty()
                                            ? Path::stateRoot(workspaceRoot) / "generated" / "cmake"
                                            : (outputDir.is_relative() ? workspaceRoot / outputDir : outputDir);
@@ -125,7 +135,8 @@ namespace rhodium
             if (File::exists(presetsPath))
             {
                 diagnostics.info("CMakeUserPresets.json already exists; not overwriting it");
-                diagnostics.info("add this cache variable to an existing preset if desired: CMAKE_PREFIX_PATH=" + presetPrefix);
+                diagnostics.info("add this cache variable to an existing preset if desired: CMAKE_PREFIX_PATH=" +
+                                 presetPrefix);
             }
             else
             {
@@ -148,6 +159,5 @@ namespace rhodium
         }
         return 0;
     }
-
 
 } // namespace rhodium

@@ -57,8 +57,8 @@ TEST(ArchiveTests, Sha256FileComputesExpectedHash)
 {
     const auto dir = tempDir("sha256");
     writeFile(dir / "hello.txt", "hello\n");
-    EXPECT_EQ(rhodium::sha256File(dir / "hello.txt"), "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03");
-    EXPECT_TRUE(rhodium::sha256Equals("ABCDEF", "abcdef"));
+    EXPECT_EQ(rhodium::Sha256::file(dir / "hello.txt"), "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03");
+    EXPECT_TRUE(rhodium::Sha256::equal("ABCDEF", "abcdef"));
     std::filesystem::remove_all(dir);
 }
 
@@ -98,7 +98,7 @@ TEST(ArchiveTests, FetcherReusesExtractedArchiveWhenMarkerMatches)
     dep.name = "hello";
     dep.source = zip.string();
     dep.sourceType = "archive";
-    dep.sha256 = rhodium::sha256File(zip);
+    dep.sha256 = rhodium::Sha256::file(zip);
     dep.stripComponents = 1;
 
     rhodium::ArchiveFetcher fetcher;

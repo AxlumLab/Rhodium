@@ -15,26 +15,23 @@ namespace rhodium
 {
     class DiagnosticSink;
 
+    struct BuildCacheGcOptions
+    {
+        std::string config;
+        std::string toolchainId;
+        bool apply = false;
+        std::string packageFilter;
+    };
+
     class ArtifactGc
     {
     public:
-        static bool runArtifacts(const LockFile &lockFile,
-                                 const std::filesystem::path &workspaceRoot,
-                                 bool apply,
-                                 const std::string &packageFilter,
-                                 DiagnosticSink &diagnostics);
-        static bool runBuildCaches(const LockFile &lockFile,
-                                   const std::filesystem::path &workspaceRoot,
-                                   const std::string &config,
-                                   const std::string &toolchainId,
-                                   bool apply,
-                                   const std::string &packageFilter,
-                                   DiagnosticSink &diagnostics);
-        static bool runSourceCaches(const LockFile &lockFile,
-                                    const std::filesystem::path &workspaceRoot,
-                                    bool apply,
-                                    const std::string &packageFilter,
-                                    DiagnosticSink &diagnostics);
+        static bool runArtifacts(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,
+                                 const std::string &packageFilter, DiagnosticSink &diagnostics);
+        static bool runBuildCaches(const LockFile &lockFile, const std::filesystem::path &workspaceRoot,
+                                   const BuildCacheGcOptions &request, DiagnosticSink &diagnostics);
+        static bool runSourceCaches(const LockFile &lockFile, const std::filesystem::path &workspaceRoot, bool apply,
+                                    const std::string &packageFilter, DiagnosticSink &diagnostics);
     };
 
 }

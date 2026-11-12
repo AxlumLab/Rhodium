@@ -16,9 +16,14 @@
 namespace rhodium
 {
 
-    std::optional<sol::table> findPlatformTable(sol::table options, const char *field, const std::string &activePlatform);
-    std::optional<sol::table> findPlatformOverlay(sol::table options, const std::string &activePlatform);
-    std::optional<sol::table> findCustomCompileOverlay(sol::table options, const std::string &activePlatform);
-    void applyDependencyOverlays(sol::table options, DependencyDesc &dependency, const std::string &activePlatform);
+    class LuaOverlayReader
+    {
+    public:
+        static std::optional<sol::table> table(sol::table options, const char *field,
+                                               const std::string &activePlatform);
+        static std::optional<sol::table> platform(sol::table options, const std::string &activePlatform);
+        static std::optional<sol::table> custom(sol::table options, const std::string &activePlatform);
+        static void apply(sol::table options, DependencyDesc &dependency, const std::string &activePlatform);
+    };
 
 } // namespace rhodium
