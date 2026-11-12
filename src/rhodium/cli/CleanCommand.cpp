@@ -1,3 +1,4 @@
+#include "rhodium/core/WorkspaceLock.hpp"
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
@@ -73,6 +74,14 @@ namespace rhodium
                     return false;
                 }
                 absolutePath = absolutePath.lexically_normal();
+                // Resolve ancestor aliases (including Windows short names), but do not
+                // follow the final entry: cleaning a symlink must remove the link itself.
+                const auto parent = std::filesystem::weakly_canonical(absolutePath.parent_path(), ec);
+                if (ec)
+                {
+                    return false;
+                }
+                absolutePath = (parent / absolutePath.filename()).lexically_normal();
 
                 const auto lowerPath = StringUtils::toLower(absolutePath.string());
                 const auto lowerRHODIUMRoot = StringUtils::toLower(normalizedRHODIUMRoot.string());
@@ -102,7 +111,23 @@ namespace rhodium
                     diagnostics.info("skip missing " + path.string());
                     return true;
                 }
-                const auto removed = std::filesystem::remove_all(path, ec);
+                auto removalPath = std::filesystem::absolute(path, ec).lexically_normal();
+                if (ec)
+                {
+                    diagnostics.error("failed to resolve clean path: " + ec.message());
+                    return false;
+                }
+#ifdef _WIN32
+                // The root can be short while descendants exceed MAX_PATH.
+                auto nativePath = removalPath.make_preferred().native();
+                if (nativePath.rfind(L"\\\\?\\", 0) != 0)
+                {
+                    nativePath = nativePath.rfind(L"\\\\", 0) == 0 ? L"\\\\?\\UNC\\" + nativePath.substr(2)
+                                                                   : L"\\\\?\\" + nativePath;
+                    removalPath = nativePath;
+                }
+#endif
+                const auto removed = std::filesystem::remove_all(removalPath, ec);
                 if (ec)
                 {
                     diagnostics.error("failed to remove " + path.string() + ": " + ec.message());
@@ -235,6 +260,11 @@ namespace rhodium
     int Commands::clean(const std::filesystem::path &workspaceRoot, const CleanOptions &options)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         return CleanSession(workspaceRoot, options, diagnostics).run();
     }
 

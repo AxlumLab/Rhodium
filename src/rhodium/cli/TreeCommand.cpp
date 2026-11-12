@@ -7,6 +7,7 @@
 
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/core/Logger.hpp"
+#include "rhodium/core/WorkspaceLock.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -20,6 +21,11 @@ namespace rhodium
     int Commands::tree(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         BuildModel model;
         if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
         {
@@ -36,12 +42,12 @@ namespace rhodium
         std::map<std::string, std::vector<std::string>> dependencyGraph;
         std::map<std::string, std::string> versions;
 
-        for (const auto& dep : model.rootPackage.dependencies)
+        for (const auto &dep : model.rootPackage.dependencies)
         {
             dependencyGraph[dep.name] = dep.dependencies;
 
             // Find version from lock file
-            for (const auto& locked : lockFile.packages)
+            for (const auto &locked : lockFile.packages)
             {
                 if (locked.name == dep.name)
                 {
@@ -52,8 +58,9 @@ namespace rhodium
         }
 
         // Print dependency tree recursively
-        std::function<void(const std::string&, const std::string&, std::set<std::string>&, bool)> printTree;
-        printTree = [&](const std::string& name, const std::string& prefix, std::set<std::string>& visited, bool isLast) {
+        std::function<void(const std::string &, const std::string &, std::set<std::string> &, bool)> printTree;
+        printTree = [&](const std::string &name, const std::string &prefix, std::set<std::string> &visited, bool isLast)
+        {
             std::string connector = isLast ? "└── " : "├── ";
             std::string version = versions.count(name) ? "@" + versions[name] : "";
 
@@ -61,13 +68,13 @@ namespace rhodium
 
             if (visited.count(name))
             {
-                return;  // Avoid infinite recursion
+                return; // Avoid infinite recursion
             }
             visited.insert(name);
 
             if (dependencyGraph.count(name))
             {
-                const auto& deps = dependencyGraph[name];
+                const auto &deps = dependencyGraph[name];
                 std::string newPrefix = prefix + (isLast ? "    " : "│   ");
 
                 for (size_t i = 0; i < deps.size(); ++i)
@@ -91,6 +98,5 @@ namespace rhodium
 
         return 0;
     }
-
 
 } // namespace rhodium

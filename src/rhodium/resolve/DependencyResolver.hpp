@@ -12,6 +12,7 @@ namespace rhodium
 {
 
     class DiagnosticSink;
+    class ToolchainSnapshot;
 
     struct DependencyRestoreOptions
     {
@@ -23,6 +24,7 @@ namespace rhodium
         std::string packageName;
         std::string updatePackage;
         std::string toolchainContentHash;
+        ToolchainSnapshot *toolchains = nullptr;
     };
 
     struct DependencyRestoreRequest

@@ -11,9 +11,9 @@
 #include "rhodium/model/DependencyDesc.hpp"
 #include "rhodium/package/PackageBuilderUtil.hpp"
 #include "rhodium/toolchain/Toolchain.hpp"
-#include <vector>
 
 #include <string>
+#include <vector>
 
 namespace rhodium
 {
@@ -22,6 +22,24 @@ namespace rhodium
 
 namespace rhodium
 {
+    // One restore owns this snapshot; discovery and preferences are loaded once.
+    class RHODIUM_EXPORT ToolchainSnapshot
+    {
+    public:
+        explicit ToolchainSnapshot(std::filesystem::path workspaceRoot);
+        ToolchainSnapshot(std::filesystem::path workspaceRoot, std::vector<ToolchainProfile> profiles);
+        const std::vector<ToolchainProfile> &profiles(DiagnosticSink &diagnostics);
+        bool preferredToolchain(std::string &value, DiagnosticSink &diagnostics);
+
+    private:
+        std::filesystem::path workspaceRoot_;
+        std::vector<ToolchainProfile> profiles_;
+        std::string preferred_;
+        bool loaded_ = false;
+        bool preferenceLoaded_ = false;
+        bool preferenceOk_ = true;
+    };
+
     class RHODIUM_EXPORT BuildToolchain
     {
     public:
@@ -29,10 +47,6 @@ namespace rhodium
                              const ToolchainRequirements &requirements = {}, DiagnosticSink *diagnostics = nullptr);
 
     private:
-        static const ToolchainProfile *select(const std::vector<ToolchainProfile> &profiles,
-                                              const std::string &requested, const ToolchainRequirements &requirements,
-                                              DiagnosticSink &sink);
-        static void apply(BuildUtil::Context &context, const ToolchainProfile &selected);
         static bool matches(const ToolchainProfile &profile, const ToolchainRequirements &requirements);
         static bool has(const ToolchainRequirements &requirements);
     };

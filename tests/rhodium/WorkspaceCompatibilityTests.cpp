@@ -109,4 +109,25 @@ namespace
         EXPECT_FALSE(std::filesystem::exists(root / ".rhodium"));
         EXPECT_TRUE(std::filesystem::exists(root / ".tpkg"));
     }
+
+#ifdef _WIN32
+    TEST_F(WorkspaceCompatibilityTests, CleaningRemovesDescendantsBeyondMaxPath)
+    {
+        const auto state = root / ".rhodium";
+        const auto nested = state / std::string(100, 'a') / std::string(100, 'b');
+        const auto extended = std::filesystem::path(L"\\\\?\\" + nested.native());
+        std::filesystem::create_directories(extended);
+        const auto file = extended / "long-cache-entry.txt";
+        ASSERT_GT(file.native().size(), 260u);
+        {
+            std::ofstream out(file);
+            ASSERT_TRUE(out.is_open());
+            out << "cached input";
+        }
+        ASSERT_TRUE(std::filesystem::exists(file));
+        const auto forwardSlashRoot = std::filesystem::path(root.generic_string());
+        EXPECT_EQ(rhodium::Commands::clean(forwardSlashRoot, rhodium::CleanOptions{true, false, false, false, ""}), 0);
+        EXPECT_FALSE(std::filesystem::exists(state));
+    }
+#endif
 }

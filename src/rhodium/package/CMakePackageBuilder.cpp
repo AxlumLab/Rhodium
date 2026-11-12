@@ -172,6 +172,7 @@ namespace rhodium
             sourceDir, buildDir, artifactDir, dependency.name, cmakeBuildType, {}, {},
         };
         context.workspaceRoot = workspaceRoot;
+        context.toolchains = options.toolchains;
         if (!BuildUtil::toolchain(context, preferredToolchain, dependency.toolchainRequirements, &diagnostics))
         {
             return false;

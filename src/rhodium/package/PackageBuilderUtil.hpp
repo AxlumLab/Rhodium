@@ -17,6 +17,7 @@
 namespace rhodium
 {
     class DiagnosticSink;
+    class ToolchainSnapshot;
 }
 
 namespace rhodium
@@ -44,28 +45,23 @@ namespace rhodium
             std::string git;
             std::filesystem::path workspaceRoot;
             std::map<std::string, std::string> environment;
+            ToolchainSnapshot *toolchains = nullptr;
         };
 
-        static bool toolchain(Context &context,
-                              const std::string &preferredToolchain = {},
-                              const ToolchainRequirements &requirements = {},
-                              DiagnosticSink *diagnostics = nullptr);
+        static bool toolchain(Context &context, const std::string &preferredToolchain = {},
+                              const ToolchainRequirements &requirements = {}, DiagnosticSink *diagnostics = nullptr);
         static std::string expand(std::string value, const Context &context);
         static std::vector<std::string> expand(const std::vector<std::string> &values, const Context &context);
-        static std::map<std::string, std::string> expand(const std::map<std::string, std::string> &values, const Context &context);
+        static std::map<std::string, std::string> expand(const std::map<std::string, std::string> &values,
+                                                         const Context &context);
         static std::map<std::string, std::string> cmakeOptions(const DependencyDesc &dependency);
         static std::vector<std::string> cmakeArgs(const DependencyDesc &dependency, const Context &context);
         static std::vector<std::string> wrap(const std::filesystem::path &workingDir,
                                              const std::map<std::string, std::string> &env,
-                                             const std::string &executable,
-                                             const std::vector<std::string> &args);
-        static bool materialize(const Context &context,
-                                const DependencyArtifacts &requested,
-                                DependencyArtifacts &exported,
-                                DiagnosticSink &diagnostics);
+                                             const std::string &executable, const std::vector<std::string> &args);
+        static bool materialize(const Context &context, const DependencyArtifacts &requested,
+                                DependencyArtifacts &exported, DiagnosticSink &diagnostics);
         static bool markBuilt(const Context &context, DiagnosticSink &diagnostics);
-        static bool validate(const Context &context,
-                             const DependencyArtifacts &artifacts,
-                             DiagnosticSink &diagnostics);
+        static bool validate(const Context &context, const DependencyArtifacts &artifacts, DiagnosticSink &diagnostics);
     };
 } // namespace rhodium

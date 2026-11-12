@@ -60,6 +60,7 @@ namespace rhodium
 
         BuildUtil::Context context{sourceDir, buildDir, artifactDir, dependency.name, config, {}, {}};
         context.workspaceRoot = workspaceRoot;
+        context.toolchains = options.toolchains;
         if (!BuildUtil::toolchain(context, preferredToolchain, dependency.toolchainRequirements, &diagnostics))
         {
             return false;

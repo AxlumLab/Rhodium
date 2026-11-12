@@ -57,12 +57,10 @@ namespace rhodium
                               DiagnosticSink &diagnostics);
         static std::filesystem::path local(const std::filesystem::path &workspaceRoot,
                                            const DependencyDesc &dependency);
-        static std::filesystem::path reusable(const PackageCache &cache, const DependencyDesc &dependency,
+        static std::filesystem::path reusable(const Context &context, const DependencyDesc &dependency,
                                               const std::filesystem::path &preferredPath);
         static void move(const std::filesystem::path &from, const std::filesystem::path &to,
                          DiagnosticSink &diagnostics);
-        static void removeSiblings(const PackageCache &cache, const DependencyDesc &dependency,
-                                   const std::filesystem::path &keepPath, DiagnosticSink &diagnostics);
         static DependencyDesc forGit(const std::filesystem::path &workspaceRoot, const DependencyDesc &dependency);
     };
 

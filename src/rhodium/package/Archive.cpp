@@ -434,8 +434,28 @@ namespace rhodium
             return false;
         }
 
+        std::error_code pathError;
+        const auto root = std::filesystem::weakly_canonical(destination, pathError);
+        if (pathError)
+        {
+            diagnostics.error("failed to resolve archive extraction directory: " + pathError.message());
+            archive_read_free(archive);
+            return false;
+        }
+        auto staysInsideRoot = [&](const std::filesystem::path &path) -> bool
+        {
+            const auto resolved = std::filesystem::weakly_canonical(path, pathError);
+            if (pathError)
+            {
+                return false;
+            }
+            const auto relative = resolved.lexically_relative(root);
+            return !relative.empty() && !relative.is_absolute() && *relative.begin() != "..";
+        };
+
         struct archive_entry *entry = nullptr;
-        while (archive_read_next_header(archive, &entry) == ARCHIVE_OK)
+        int headerResult = ARCHIVE_OK;
+        while ((headerResult = archive_read_next_header(archive, &entry)) == ARCHIVE_OK)
         {
             const auto entryName = std::string(archive_entry_pathname(entry) ? archive_entry_pathname(entry) : "");
             const auto relative = ArchiveData::strip(entryName, stripComponents);
@@ -450,29 +470,47 @@ namespace rhodium
                 archive_read_data_skip(archive);
                 continue;
             }
-            const auto outPath = (destination / relative.path).lexically_normal();
-            const auto relToDest = outPath.lexically_relative(destination);
-            if (relToDest.empty() || relToDest.string().rfind("..", 0) == 0)
+            const auto outPath = (root / relative.path).lexically_normal();
+            if (!staysInsideRoot(outPath))
             {
                 diagnostics.error("unsafe archive entry: " + entryName + " reason: path traversal");
                 archive_read_free(archive);
                 return false;
             }
 
-            archive_entry_set_pathname(entry, outPath.string().c_str());
             const auto type = archive_entry_filetype(entry);
-            if (type == AE_IFDIR)
+            if (const auto *symlink = archive_entry_symlink(entry))
             {
-                File::mkdir(outPath, nullptr);
-                continue;
+                const std::filesystem::path target(symlink);
+                if (target.empty() || target.has_root_path() || !staysInsideRoot(outPath.parent_path() / target))
+                {
+                    diagnostics.error("unsafe archive symlink: " + entryName);
+                    archive_read_free(archive);
+                    return false;
+                }
             }
-            if (!File::mkdir(outPath.parent_path(), &error))
+            if (const auto *hardlink = archive_entry_hardlink(entry))
             {
-                diagnostics.error("failed to create archive entry parent: " + error);
+                const auto target = ArchiveData::strip(hardlink, stripComponents);
+                if (target.unsafe || target.skipped || target.path.empty() || !staysInsideRoot(root / target.path))
+                {
+                    diagnostics.error("unsafe archive hardlink: " + entryName);
+                    archive_read_free(archive);
+                    return false;
+                }
+                archive_entry_set_hardlink(entry, (root / target.path).string().c_str());
+            }
+            else if (type != AE_IFREG && type != AE_IFDIR && type != AE_IFLNK)
+            {
+                diagnostics.error("unsupported archive entry type: " + entryName);
                 archive_read_free(archive);
                 return false;
             }
-            const int result = archive_read_extract(archive, entry, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM);
+            archive_entry_set_pathname(entry, outPath.string().c_str());
+            const int result =
+                archive_read_extract(archive, entry,
+                                     ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_SYMLINKS |
+                                         ARCHIVE_EXTRACT_SECURE_NODOTDOT);
             if (result != ARCHIVE_OK)
             {
                 diagnostics.error("archive extraction failed: " + archivePath.string() + " entry=" + entryName + ": " +
@@ -480,6 +518,13 @@ namespace rhodium
                 archive_read_free(archive);
                 return false;
             }
+        }
+
+        if (headerResult != ARCHIVE_EOF)
+        {
+            diagnostics.error("failed to read archive header: " + archivePath.string());
+            archive_read_free(archive);
+            return false;
         }
 
         archive_read_free(archive);

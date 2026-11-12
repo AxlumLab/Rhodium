@@ -1,3 +1,5 @@
+#include "rhodium/package/ToolchainContextResolver.hpp"
+#include "rhodium/core/WorkspaceLock.hpp"
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
@@ -88,6 +90,11 @@ namespace rhodium
         const auto startTime = std::chrono::steady_clock::now();
 
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         RestoreTimer timer(diagnostics, startTime);
         if (buildOnly && exportOnly)
         {
@@ -128,6 +135,8 @@ namespace rhodium
 
         DependencyResolver resolver;
         DependencyRestoreOptions options;
+        ToolchainSnapshot toolchains(workspaceRoot, {selectedToolchain});
+        options.toolchains = &toolchains;
         options.locked = locked;
         options.packageName = packageName;
         options.buildOnly = buildOnly;

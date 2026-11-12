@@ -20,9 +20,13 @@ namespace rhodium
     class RHODIUM_EXPORT GitFetcher
     {
     public:
+        static bool cachedOrigin(const std::filesystem::path &repository, std::string &url);
+        static std::filesystem::path localPath(const std::string &source, const std::filesystem::path &workspaceRoot);
         bool initialize(DiagnosticSink &diagnostics) const;
-        bool fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, DiagnosticSink &diagnostics) const;
-        bool fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, std::string &commit, DiagnosticSink &diagnostics) const;
+        bool fetch(const DependencyDesc &dependency, const std::filesystem::path &destination,
+                   DiagnosticSink &diagnostics) const;
+        bool fetch(const DependencyDesc &dependency, const std::filesystem::path &destination, std::string &commit,
+                   DiagnosticSink &diagnostics, bool refresh = false) const;
     };
 
 } // namespace rhodium

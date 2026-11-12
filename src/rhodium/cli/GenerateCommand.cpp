@@ -1,3 +1,4 @@
+#include "rhodium/core/WorkspaceLock.hpp"
 #include "rhodium/core/Path.hpp"
 
 #include "rhodium/cli/Commands.hpp"
@@ -110,6 +111,11 @@ namespace rhodium
                            const std::vector<std::string> &cliOverrides)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         RestoredPackages::Result result;
         if (!RestoredPackages::load({workspaceRoot, toolchainId, configOption, cliOverrides}, result, diagnostics))
         {

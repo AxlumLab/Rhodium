@@ -1,3 +1,4 @@
+#include "rhodium/core/WorkspaceLock.hpp"
 #include "rhodium/cli/Commands.hpp"
 #include "rhodium/cli/CommandContext.hpp"
 
@@ -534,6 +535,11 @@ namespace rhodium
     int Commands::sdkDetect(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         std::vector<ToolchainProfile> profiles;
         if (!ToolchainDetector::writeHost(workspaceRoot, profiles, diagnostics))
         {
@@ -607,6 +613,11 @@ namespace rhodium
     int Commands::sdkList(const std::filesystem::path &workspaceRoot, bool refresh, const std::string &sourceFilter)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LocalToolchainConfig localConfig;
         if (!ToolchainRegistry::readConfig(workspaceRoot, localConfig, diagnostics))
         {
@@ -663,6 +674,11 @@ namespace rhodium
     int Commands::sdkShow(const std::filesystem::path &workspaceRoot, const std::string &id)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         const auto profiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
         const auto found = std::find_if(profiles.begin(), profiles.end(),
                                         [&](const LoadedToolchainProfile &profile)
@@ -761,6 +777,14 @@ namespace rhodium
         {
             profile.git = ToolchainDetector::findExecutable("git");
         }
+        const auto mutationRoot = source == ToolchainSource::GlobalUser
+                                      ? ToolchainRegistry::globalPath().parent_path().parent_path()
+                                      : workspaceRoot;
+        auto workspaceLock = WorkspaceLock::acquire(mutationRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         std::vector<ToolchainProfile> profiles;
         if (!ToolchainRegistry::readUser(workspaceRoot, source, profiles, diagnostics))
         {
@@ -803,6 +827,14 @@ namespace rhodium
             (source != ToolchainSource::ProjectUser && source != ToolchainSource::GlobalUser))
         {
             diagnostics.error("sdk remove --source must be project-user or global-user");
+            return 1;
+        }
+        const auto mutationRoot = source == ToolchainSource::GlobalUser
+                                      ? ToolchainRegistry::globalPath().parent_path().parent_path()
+                                      : workspaceRoot;
+        auto workspaceLock = WorkspaceLock::acquire(mutationRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
             return 1;
         }
         std::vector<ToolchainProfile> profiles;
@@ -849,6 +881,11 @@ namespace rhodium
     int Commands::sdkDump(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         std::vector<ToolchainProfile> profiles;
         if (!ToolchainRegistry::read(ToolchainDetector::cachePath(workspaceRoot), profiles, diagnostics) ||
             profiles.empty())
@@ -865,6 +902,11 @@ namespace rhodium
     int Commands::sdkSelect(const std::filesystem::path &workspaceRoot, const std::string &toolchainId)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         if (toolchainId.empty())
         {
             diagnostics.error("sdk select requires a toolchain id");
@@ -917,6 +959,11 @@ namespace rhodium
     int Commands::sdkClear(const std::filesystem::path &workspaceRoot)
     {
         ConsoleDiagnosticSink diagnostics;
+        auto workspaceLock = WorkspaceLock::acquire(workspaceRoot, diagnostics, true);
+        if (!workspaceLock)
+        {
+            return 1;
+        }
         LocalToolchainConfig config;
         if (!ToolchainRegistry::readConfig(workspaceRoot, config, diagnostics))
         {

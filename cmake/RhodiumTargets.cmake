@@ -47,6 +47,9 @@ set(RHODIUM_CORE_SOURCES
 
 add_library(rhodium_core ${RHODIUM_CORE_SOURCES})
 add_library(Rhodium::Core ALIAS rhodium_core)
+if(WIN32)
+    target_link_libraries(rhodium_core PRIVATE advapi32)
+endif()
 set_target_properties(rhodium_core PROPERTIES
     EXPORT_NAME Core
     VERSION ${PROJECT_VERSION}

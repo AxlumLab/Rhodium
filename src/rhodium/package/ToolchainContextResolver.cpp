@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <map>
 #include <vector>
+#include <utility>
 
 namespace rhodium
 {
@@ -64,6 +65,39 @@ namespace rhodium
                 return profiles;
             }
         };
+    }
+
+    ToolchainSnapshot::ToolchainSnapshot(std::filesystem::path workspaceRoot) : workspaceRoot_(std::move(workspaceRoot))
+    {
+    }
+
+    ToolchainSnapshot::ToolchainSnapshot(std::filesystem::path workspaceRoot, std::vector<ToolchainProfile> profiles)
+        : workspaceRoot_(std::move(workspaceRoot)), profiles_(std::move(profiles)), loaded_(true)
+    {
+    }
+
+    const std::vector<ToolchainProfile> &ToolchainSnapshot::profiles(DiagnosticSink &diagnostics)
+    {
+        if (!loaded_)
+        {
+            profiles_ = BuildProfiles::load(workspaceRoot_, diagnostics);
+            loaded_ = true;
+        }
+        return profiles_;
+    }
+
+    bool ToolchainSnapshot::preferredToolchain(std::string &value, DiagnosticSink &diagnostics)
+    {
+        if (!preferenceLoaded_)
+        {
+            LocalToolchainConfig config;
+            preferenceOk_ =
+                workspaceRoot_.empty() || ToolchainRegistry::readConfig(workspaceRoot_, config, diagnostics);
+            preferred_ = config.preferredToolchain;
+            preferenceLoaded_ = true;
+        }
+        value = preferred_;
+        return preferenceOk_;
     }
 
     bool BuildToolchain::matches(const ToolchainProfile &profile, const ToolchainRequirements &requirements)
@@ -146,10 +180,34 @@ namespace rhodium
         return !requirements.family.empty() || !requirements.abi.empty() || !requirements.binaryFormat.empty();
     }
 
-    const ToolchainProfile *BuildToolchain::select(const std::vector<ToolchainProfile> &profiles,
-                                                   const std::string &requested,
-                                                   const ToolchainRequirements &requirements, DiagnosticSink &sink)
+    bool BuildToolchain::populate(BuildUtil::Context &context, const std::string &preferredToolchain,
+                                  const ToolchainRequirements &requirements, DiagnosticSink *providedDiagnostics)
     {
+        class NullDiagnosticSink final : public DiagnosticSink
+        {
+        public:
+            void report(const Diagnostic &) override {}
+        };
+
+        NullDiagnosticSink diagnostics;
+        DiagnosticSink &sink = providedDiagnostics ? *providedDiagnostics : diagnostics;
+        ToolchainSnapshot localSnapshot(context.workspaceRoot);
+        auto &snapshot = context.toolchains ? *context.toolchains : localSnapshot;
+        const auto &profiles = snapshot.profiles(sink);
+        if (profiles.empty())
+        {
+            return false;
+        }
+
+        std::string requested = preferredToolchain;
+        if (requested.empty() && !context.workspaceRoot.empty())
+        {
+            if (!snapshot.preferredToolchain(requested, sink))
+            {
+                return false;
+            }
+        }
+
         const ToolchainProfile *selected = nullptr;
         if (!requested.empty())
         {
@@ -164,12 +222,12 @@ namespace rhodium
             if (!selected)
             {
                 sink.error("requested toolchain was not detected: " + requested);
-                return nullptr;
+                return false;
             }
             if (!matches(*selected, requirements))
             {
                 sink.error("selected toolchain does not satisfy package toolchain requirements: " + selected->id);
-                return nullptr;
+                return false;
             }
         }
         else
@@ -195,66 +253,25 @@ namespace rhodium
             }
             if (!selected)
             {
-                sink.error("no complete detected toolchain satisfies package toolchain requirements; pass --toolchain "
-                           "<id> to select a local profile explicitly");
-                return nullptr;
-            }
-        }
-
-        return selected;
-    }
-
-    void BuildToolchain::apply(BuildUtil::Context &context, const ToolchainProfile &selected)
-    {
-        context.platform = selected.platform;
-        context.arch = selected.targetArch;
-        context.cc = selected.compiler.string();
-        context.cxx = selected.cxxCompiler.empty() ? selected.compiler.string() : selected.cxxCompiler.string();
-        context.linker = selected.linker.string();
-        context.archiver = selected.archiver.string();
-        context.rc = selected.resourceCompiler.string();
-        context.mt = selected.manifestTool.string();
-        context.cmake = selected.cmake.empty() ? "cmake" : selected.cmake.string();
-        context.ninja = selected.ninja.empty() ? "ninja" : selected.ninja.string();
-        context.git = selected.git.empty() ? "git" : selected.git.string();
-        context.environment = selected.environment;
-    }
-
-    bool BuildToolchain::populate(BuildUtil::Context &context, const std::string &preferredToolchain,
-                                  const ToolchainRequirements &requirements, DiagnosticSink *providedDiagnostics)
-    {
-        class NullDiagnosticSink final : public DiagnosticSink
-        {
-        public:
-            void report(const Diagnostic &) override {}
-        };
-
-        NullDiagnosticSink diagnostics;
-        DiagnosticSink &sink = providedDiagnostics ? *providedDiagnostics : diagnostics;
-        const auto profiles = BuildProfiles::load(context.workspaceRoot, sink);
-        if (profiles.empty())
-        {
-            return false;
-        }
-
-        std::string requested = preferredToolchain;
-        if (requested.empty() && !context.workspaceRoot.empty())
-        {
-            LocalToolchainConfig config;
-            if (!ToolchainRegistry::readConfig(context.workspaceRoot, config, sink))
-            {
+                sink.error(
+                    "no complete detected toolchain satisfies package toolchain requirements; pass --toolchain <id> to select a local profile explicitly");
                 return false;
             }
-            requested = config.preferredToolchain;
         }
 
-        const auto *selected = select(profiles, requested, requirements, sink);
-        if (!selected)
-        {
-            return false;
-        }
         sink.info("selected toolchain: " + selected->id);
-        apply(context, *selected);
+        context.platform = selected->platform;
+        context.arch = selected->targetArch;
+        context.cc = selected->compiler.string();
+        context.cxx = selected->cxxCompiler.empty() ? selected->compiler.string() : selected->cxxCompiler.string();
+        context.linker = selected->linker.string();
+        context.archiver = selected->archiver.string();
+        context.rc = selected->resourceCompiler.string();
+        context.mt = selected->manifestTool.string();
+        context.cmake = selected->cmake.empty() ? "cmake" : selected->cmake.string();
+        context.ninja = selected->ninja.empty() ? "ninja" : selected->ninja.string();
+        context.git = selected->git.empty() ? "git" : selected->git.string();
+        context.environment = selected->environment;
         return true;
     }
 
