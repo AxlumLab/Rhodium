@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rhodium"
+  short_description: "Develop Rhodium packages, SDK profiles and embedding"
+  default_prompt: "Use $rhodium to investigate this dependency-manager issue and check AxlumBuild compatibility when relevant."
