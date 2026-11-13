@@ -1,52 +1,70 @@
 # Rhodium
 
-Repository: https://github.com/AxlumLab/Rhodium.git
+**English** | [简体中文](README.zh-CN.md)
 
-Rhodium is a cross-platform C/C++ dependency management system designed to serve CMake projects.
+**A C/C++ dependency manager for CMake projects.**
 
-It is **not** a replacement for CMake, Ninja, Visual Studio, Xcode, or any native build backend. Its job is to restore source, archive, local, or prebuilt dependencies; build dependency artifacts when needed; write a lock file for reproducibility; and generate CMake integration files that your normal CMake project can consume.
+Rhodium fetches, builds, and caches third-party dependencies, records resolved source revisions in a lockfile, and generates CMake integration targets.
 
-The executable is `rhodium` (`rhodium.exe` on Windows). Rhodium reads `rhodium.lua` first and falls back to `tpkg.lua`. State uses an existing `.rhodium/` first, otherwise an existing `.tpkg/`, otherwise a new `.rhodium/`. New lockfiles use `rhodium.lock.toml`; an existing `tpkg.lock.toml` is reused when the new name is absent. Generated CMake packages and imported targets use `rhodium` and `rhodium::`.
+## Features
 
-## Project status
+- **Lua manifests:** Declare Git, archive, local, or prebuilt dependencies in `rhodium.lua`.
+- **Dependency builds:** CMake, Make, configure + Make, custom, header-only, and prebuilt modes.
+- **Reproducibility:** Track resolved sources in `rhodium.lock.toml` and use `restore --locked`.
+- **Toolchain awareness:** Discover compiler/SDK profiles and keep artifacts separated by build configuration.
+- **CMake integration:** Export targets such as `rhodium::fmt` for normal `target_link_libraries` use.
+- **Developer tools:** Local overrides, transitive dependency graphs, mirrors, package updates, and cache cleanup.
 
-Rhodium is under active development.
+## Build from source
 
-Current validation scope:
+Requirements: CMake **3.25+**, a **C++20** compiler, Git, and [vcpkg](https://github.com/microsoft/vcpkg). Ninja is recommended.
 
-- Desktop platforms are the current tested target.
-- Windows desktop workflows are the most exercised path.
-- Linux and macOS are intended cross-platform targets but should be validated per project.
-- Android toolchain profiles are supported and will continue to be tested.
-- iOS support is planned but not implemented yet.
-
-## Core workflow
-
-```bash
-# Check the local environment
-rhodium doctor
-
-# Detect local C/C++ and platform toolchains
-rhodium sdk detect
-rhodium sdk list
-
-# Restore dependency sources and artifacts
-rhodium restore --config debug --toolchain windows-msvc-x64
-
-# Generate CMake integration files
-rhodium generate --config debug --toolchain windows-msvc-x64
+```sh
+git clone https://github.com/AxlumLab/Rhodium.git
+cd Rhodium
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DRHODIUM_VCPKG_ROOT=/path/to/vcpkg -DRHODIUM_BUILD_TESTS=OFF
+cmake --build build --config Release
 ```
 
-A normal project keeps using CMake:
+Replace `/path/to/vcpkg` with the actual vcpkg root. Alternatively configure `CMAKE_TOOLCHAIN_FILE` or `VCPKG_ROOT`. On Windows, use an MSVC-enabled developer shell for Ninja builds. The default configuration builds a static `Rhodium::Core` library and the `rhodium` CLI (`rhodium.exe` on Windows). Add the CLI output directory to your `PATH`.
 
-```cmake
-include("${CMAKE_SOURCE_DIR}/.rhodium/generated/cmake/rhodiumConfig.cmake")
+See [installation](docs/installation.md) and [embedding](docs/guide/embedding.md) for further options.
+
+## Quick start
+
+The repository includes a complete [CMake example](examples/basic-cmake/). Run these commands from the repository root after building Rhodium and placing the CLI on `PATH`.
+
+### 1. Discover a toolchain
+
+```sh
+rhodium --root examples/basic-cmake sdk detect
+rhodium --root examples/basic-cmake sdk list
 ```
 
-## Minimal `rhodium.lua`
+### 2. Restore and generate
+
+Replace `YOUR_TOOLCHAIN_ID` with an ID from `sdk list`.
+
+```sh
+rhodium --root examples/basic-cmake restore --config debug --toolchain YOUR_TOOLCHAIN_ID
+rhodium --root examples/basic-cmake generate --config debug --toolchain YOUR_TOOLCHAIN_ID
+```
+
+### 3. Build the example
+
+```sh
+cmake -S examples/basic-cmake -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/example
+```
+
+Use compatible compiler, architecture, and Debug/Release settings for the restored packages and the consuming project. The example manifest targets `x64` by default.
+
+## Declaring dependencies
+
+Create `rhodium.lua` in your CMake project:
 
 ```lua
-package("ExampleApp")
+package("MyApp")
 version("0.1.0")
 default_config("debug")
 default_platform("host")
@@ -69,36 +87,63 @@ require("fmt", {
 })
 ```
 
-## Library integration
+After `rhodium restore` and `rhodium generate`, consume the generated CMake configuration:
 
-Rhodium can also be installed as a static or shared C++20 library. Link the
-`Rhodium::Core` target from `find_package(Rhodium CONFIG REQUIRED)`; the CLI
-is optional. See [Embedding Rhodium](docs/guide/embedding.md) for build,
-installation and host-program examples.
+```cmake
+cmake_minimum_required(VERSION 3.25)
+project(MyApp LANGUAGES CXX)
+
+set(RHODIUM_DEPS_FILE "${CMAKE_SOURCE_DIR}/.rhodium/generated/cmake/rhodiumConfig.cmake")
+if(NOT EXISTS "${RHODIUM_DEPS_FILE}")
+    message(FATAL_ERROR "Run rhodium restore and rhodium generate first")
+endif()
+include("${RHODIUM_DEPS_FILE}")
+
+add_executable(myapp src/main.cpp)
+target_link_libraries(myapp PRIVATE rhodium::fmt)
+```
+
+## CLI at a glance
+
+| Command | Purpose |
+| --- | --- |
+| `rhodium sdk detect` / `rhodium sdk list` | Discover toolchains |
+| `rhodium restore` | Fetch, build, and export dependency artifacts |
+| `rhodium restore --locked` | Restore using the current lockfile |
+| `rhodium generate` | Generate imported CMake targets |
+| `rhodium deps` / `rhodium tree` | Inspect dependencies |
+| `rhodium update [package]` | Update resolved dependency state |
+| `rhodium packages` / `rhodium packages gc` | Inspect and clean caches |
+
+See the [full CLI reference](docs/reference/command-reference.md) for options. Some diagnostic commands, including `doctor`, are only registered in Debug builds.
+
+## Embed as a C++20 library
+
+Rhodium can be installed as a static or shared library. The CLI is optional when embedding it.
+
+```cmake
+find_package(Rhodium CONFIG REQUIRED)
+target_link_libraries(myapp PRIVATE Rhodium::Core)
+```
+
+`Rhodium::Core` is the SDK library; generated third-party package targets use the separate `rhodium::` namespace. See [Embedding Rhodium](docs/guide/embedding.md).
+
+## Platform status and migration
+
+| Platform | Status |
+| --- | --- |
+| Windows Linux and macOS | Primary tested development workflow |
+| Android | Toolchain-profile support exists; |
+| iOS | Planned, not yet implemented |
 
 ## Documentation
 
-Start here:
+- [Documentation index](docs/INDEX.md), [Getting started](docs/getting-started.md), [Installation](docs/installation.md)
+- [DSL overview](docs/dsl/overview.md), [Toolchains](docs/guide/toolchains.md), [Command reference](docs/reference/command-reference.md)
+- [Architecture](docs/architecture/overview.md), [Examples](examples/basic-cmake/), [Changelog](CHANGELOG.md)
 
-- [Documentation index](docs/INDEX.md)
-- [Getting started](docs/getting-started.md)
-- [Basic workflow](docs/guide/basic-workflow.md)
-- [DSL overview](docs/dsl/overview.md)
-- [Command reference](docs/reference/command-reference.md)
-- [Architecture overview](docs/architecture/overview.md)
-- [Contributor guide](CONTRIBUTING.md)
+## Contributing and license
 
-## Repository layout
+Contributions and issues are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), or open a [GitHub Issue](https://github.com/AxlumLab/Rhodium/issues).
 
-```text
-src/rhodium/          Rhodium implementation
-cmake/             CMake project glue
-docs/              User, reference, architecture, and contributor docs
-examples/          Example dependency manifests and project layouts
-tests/             Unit and integration-style tests
-scripts/           Local helper scripts
-```
-
-## License
-
-This snapshot preserves the existing project copyright notice. See [LICENSE](LICENSE).
+Licensed under the **MIT License**. See [LICENSE](LICENSE).
