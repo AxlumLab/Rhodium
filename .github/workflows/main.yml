@@ -58,10 +58,12 @@ jobs:
               output.write(f'version={version}\nbaseline={baseline}\n')
           PY
 
-      - name: Require release commit on main
+      - name: Require annotated release tag on main
         if: github.ref_type == 'tag'
         shell: bash
-        run: git merge-base --is-ancestor HEAD origin/main
+        run: |
+          [[ "$(git cat-file -t "$GITHUB_REF")" == "tag" ]]
+          git merge-base --is-ancestor HEAD origin/main
 
   build:
     name: ${{ matrix.slug }} Release
@@ -139,15 +141,61 @@ jobs:
         shell: bash
         run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Cache vcpkg binaries and downloads
-        uses: actions/cache@v4
+      - name: Restore vcpkg binaries and downloads
+        id: vcpkg_cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             vcpkg/downloads
             out/vcpkg-binary-cache
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}-
             vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-
+
+      - name: Set up Python for source download fallback
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache verified Lua source archive
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          port = Path('vcpkg/ports/lua')
+          metadata = json.loads((port / 'vcpkg.json').read_text())
+          version = metadata.get('version') or metadata.get('version-string') or metadata.get('version-semver')
+          expected = re.search(r'SHA512\s+([0-9a-f]{128})', (port / 'portfile.cmake').read_text()).group(1)
+          archive = Path('vcpkg/downloads') / f'lua-{version}.tar.gz'
+          if archive.exists() and hashlib.sha512(archive.read_bytes()).hexdigest() == expected:
+              print(f'Using verified cached {archive.name}')
+          else:
+              # The Brazilian mirror is listed by Lua.org; all candidates must match the pinned SHA-512.
+              origins = ['https://www.lua.org/ftp/', 'https://lua.org/ftp/',
+                         'https://www.tecgraf.puc-rio.br/lua/ftp/']
+              for origin in origins:
+                  try:
+                      with urllib.request.urlopen(origin + archive.name, timeout=45) as response:
+                          data = response.read()
+                      if hashlib.sha512(data).hexdigest() != expected:
+                          raise ValueError('source archive SHA-512 mismatch')
+                      archive.parent.mkdir(parents=True, exist_ok=True)
+                      temporary = archive.with_suffix('.partial')
+                      temporary.write_bytes(data)
+                      temporary.replace(archive)
+                      print(f'Cached verified {archive.name} from {origin}')
+                      break
+                  except (OSError, ValueError) as error:
+                      print(f'{origin}: {error}')
+              else:
+                  raise SystemExit('No Lua source endpoint provided the pinned archive')
+          PY
 
       - name: Build on Windows
         if: runner.os == 'Windows'
@@ -188,6 +236,15 @@ jobs:
           name: rhodium-${{ needs.prepare.outputs.version }}-${{ matrix.slug }}-${{ matrix.triplet }}
           path: dist/*
           if-no-files-found: error
+
+      - name: Save completed dependencies even after build failure
+        if: always() && steps.vcpkg_cache.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            vcpkg/downloads
+            out/vcpkg-binary-cache
+          key: ${{ steps.vcpkg_cache.outputs.cache-primary-key }}
 
   ci-summary:
     name: CI summary

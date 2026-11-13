@@ -44,7 +44,11 @@ Every build checks out `microsoft/vcpkg` at the manifest's `builtin-baseline` wi
 `fetch-depth: 0`, then verifies that `versions/baseline.json` exists at that commit.
 The complete history is required for pinned port versions; do not replace it
 with a shallow checkout of the default branch. Cache downloads and binary packages,
-not dependency build trees shared between compiler configurations.
+not dependency build trees shared between compiler configurations. Save completed
+binary packages even if a later port or project build fails, so retries can reuse
+the work. CI prefetches Lua from its official endpoints or the Lua.org-listed
+PUC-Rio mirror and verifies the SHA-512 pinned in the checked-out vcpkg port;
+TLS verification and source hashes must never be disabled to bypass a download failure.
 
 The required Release build matrix is:
 
