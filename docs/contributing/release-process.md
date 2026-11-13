@@ -33,12 +33,28 @@ Do not move or overwrite an existing release tag. Fix a failed workflow and
 release a new patch version if the tagged source must change. Re-running a
 successful tag's workflow may replace its generated assets without moving the tag.
 
+If only the workflow or package configuration needs repair, fix it on `main` and
+use **Actions ? CI ? Run workflow** on `main`, with `release_tag` set to the existing
+tag (for example `0.1.3`). The agent must trigger this recovery when responsible
+for the release. The repaired workflow checks out and builds that tag's exact
+source commit; it does not move the remote tag. With the GitHub CLI:
+
+```sh
+gh workflow run main.yml --ref main -f release_tag=0.1.3
+```
+
+Leave `release_tag` empty for a manual CI-only run. A source-code change requires
+a new version and tag; workflow recovery is not a way to change released source.
+
 ## Automated build and publication
 
 `.github/workflows/main.yml` runs on main/master pushes, pull requests, manual
-runs, and numeric version-tag pushes. Only a version-tag push publishes a Release.
-The prepare job checks version equality and requires the tagged commit to be on
-`main`. Invalid tags fail before dependency builds.
+runs, and numeric version-tag pushes. Version-tag pushes publish automatically;
+a manual run with `release_tag` publishes or recovers that existing version.
+The prepare job checks version equality, the annotated tag, and that its exact
+source commit is on `main`. Invalid tags fail before dependency builds. Checkout
+must use an explicit tag ref when validating tags; the build jobs then use the
+validated commit SHA.
 
 Every build checks out `microsoft/vcpkg` at the manifest's `builtin-baseline` with
 `fetch-depth: 0`, then verifies that `versions/baseline.json` exists at that commit.
@@ -54,9 +70,14 @@ The required Release build matrix is:
 
 | Runner | Compiler | vcpkg triplet | Archive |
 | --- | --- | --- | --- |
-| Windows | MSVC x64 | `x64-windows` | `.zip` |
+| Windows | MSVC x64 | `x64-windows-static` | `.zip` |
 | Linux | GCC x64 | `x64-linux` | `.tar.gz` |
 | macOS | Apple Clang ARM64 | `arm64-osx` | `.tar.gz` |
+
+CI explicitly sets `BUILD_SHARED_LIBS=OFF`. Third-party vcpkg dependencies use
+static linkage on all three platforms. Windows uses `x64-windows-static` and the
+static MSVC runtime (`/MT`); `x64-linux` and `arm64-osx` also default to static
+third-party libraries. Do not substitute dynamic dependency triplets in release jobs.
 
 Windows initializes the MSVC environment before the Ninja build. Each job builds,
 installs, runs the installed CLI's `--version`, and uploads a versioned archive
@@ -71,7 +92,7 @@ A new Release remains a draft until its assets have been uploaded.
 
 Package names include the version, compiler/platform, and triplet, for example:
 
-- `rhodium-0.1.3-windows-msvc-x64-windows.zip`
+- `rhodium-0.1.3-windows-msvc-x64-windows-static.zip`
 - `rhodium-0.1.3-linux-gcc-x64-linux.tar.gz`
 - `rhodium-0.1.3-macos-clang-arm64-osx.tar.gz`
 

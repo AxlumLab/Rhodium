@@ -11,13 +11,19 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing annotated tag to publish using this workflow (empty = CI only)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: ${{ github.workflow }}-${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' && inputs.release_tag == '' }}
 
 jobs:
   prepare:
@@ -26,20 +32,27 @@ jobs:
     outputs:
       version: ${{ steps.metadata.outputs.version }}
       baseline: ${{ steps.metadata.outputs.baseline }}
+      commit: ${{ steps.metadata.outputs.commit }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
+          # Explicit tag ref avoids checkout's default commit-SHA fallback rewriting local tag refs.
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || (github.ref_type == 'tag' && github.ref) || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Read release metadata
         id: metadata
         shell: bash
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
         run: |
           python3 - <<'PY'
           import json
           import os
           import re
+          import subprocess
           from pathlib import Path
 
           manifest = json.loads(Path('vcpkg.json').read_text())
@@ -52,17 +65,22 @@ jobs:
           cmake = Path('CMakeLists.txt').read_text()
           if not re.search(r'project\(Rhodium\s+VERSION\s+' + re.escape(version) + r'\s', cmake):
               raise SystemExit('CMake and vcpkg manifest versions must match')
-          if os.environ['GITHUB_REF_TYPE'] == 'tag' and os.environ['GITHUB_REF_NAME'] != version:
+          release_tag = os.environ['REQUESTED_RELEASE_TAG']
+          if release_tag and release_tag != version:
               raise SystemExit('Release tag must exactly match the project version (no v prefix)')
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'version={version}\nbaseline={baseline}\n')
+              output.write(f'version={version}\nbaseline={baseline}\ncommit={commit}\nrelease_tag={release_tag}\n')
           PY
 
       - name: Require annotated release tag on main
-        if: github.ref_type == 'tag'
+        if: steps.metadata.outputs.release_tag != ''
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
         run: |
-          [[ "$(git cat-file -t "$GITHUB_REF")" == "tag" ]]
+          [[ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" == "tag" ]]
+          [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{}")" == "$(git rev-parse HEAD)" ]]
           git merge-base --is-ancestor HEAD origin/main
 
   build:
@@ -74,7 +92,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            triplet: x64-windows
+            triplet: x64-windows-static
             slug: windows-msvc
           - os: ubuntu-latest
             triplet: x64-linux
@@ -99,6 +117,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.prepare.outputs.commit }}
           persist-credentials: false
 
       # Port versions may refer to older Git trees: a shallow checkout is insufficient.
@@ -200,7 +219,11 @@ jobs:
       - name: Build on Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\scripts\build.ps1 -BuildDir $env:BUILD_DIR -BuildType $env:BUILD_TYPE -VcpkgRoot "$env:GITHUB_WORKSPACE\vcpkg" -VcpkgTriplet $env:VCPKG_TARGET_TRIPLET
+        run: |
+          cmake -S . -B "$env:BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF "-DRHODIUM_VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" "-DVCPKG_TARGET_TRIPLET=$env:VCPKG_TARGET_TRIPLET"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build "$env:BUILD_DIR" --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build on Unix
         if: runner.os != 'Windows'
@@ -209,7 +232,9 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           RHODIUM_VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-        run: bash scripts/build.sh
+        run: |
+          cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF "-DRHODIUM_VCPKG_ROOT=$RHODIUM_VCPKG_ROOT" "-DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET"
+          cmake --build "$BUILD_DIR" --config Release
 
       - name: Install package
         shell: bash
@@ -264,7 +289,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: [prepare, build, ci-summary]
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: needs.prepare.outputs.release_tag != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -272,6 +297,7 @@ jobs:
       - name: Checkout tagged source
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.prepare.outputs.commit }}
           persist-credentials: false
 
       - name: Download release packages
@@ -287,7 +313,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           cd dist
-          for package in "rhodium-$VERSION-windows-msvc-x64-windows.zip" "rhodium-$VERSION-linux-gcc-x64-linux.tar.gz" "rhodium-$VERSION-macos-clang-arm64-osx.tar.gz"; do
+          for package in "rhodium-$VERSION-windows-msvc-x64-windows-static.zip" "rhodium-$VERSION-linux-gcc-x64-linux.tar.gz" "rhodium-$VERSION-macos-clang-arm64-osx.tar.gz"; do
             test -s "$package"
           done
           sha256sum *.zip *.tar.gz > SHA256SUMS
@@ -297,7 +323,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" dist/* --clobber

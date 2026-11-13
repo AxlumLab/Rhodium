@@ -7,6 +7,7 @@ This project follows a human-maintained changelog. Record user-visible changes o
 - Fixed CI vcpkg baseline resolution by checking out the pinned baseline with full history.
 - Verify Lua source downloads with official mirror fallback, and retain dependency caches after build failures.
 - Build installable Windows MSVC, Linux GCC, and macOS ARM64 Clang packages; removed Linux Clang.
+- Statically link release dependencies; Windows packages also use the static MSVC runtime.
 - Publish tagged versions automatically as GitHub Releases with archives and SHA-256 checksums.
 - Added static/shared library installs and CMake package exports.
 - Default new lockfiles to `rhodium.lock.toml`, retaining legacy lockfile compatibility.
