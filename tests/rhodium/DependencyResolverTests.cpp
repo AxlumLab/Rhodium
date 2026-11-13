@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/core/FileSystem.hpp"
 #include "rhodium/core/Process.hpp"

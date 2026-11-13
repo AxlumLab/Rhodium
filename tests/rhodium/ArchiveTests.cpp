@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/package/Archive.hpp"
 #include "rhodium/utils/Sha256.hpp"
 #include "rhodium/core/FileSystem.hpp"

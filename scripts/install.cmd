@@ -1,4 +1,8 @@
 @echo off
+REM @Author: AxlumLab
+REM @LastEditors: AxlumLab
+REM Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 setlocal
 
 set "BUILD_TYPE=%BUILD_TYPE%"

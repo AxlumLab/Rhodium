@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 set(RHODIUM_VCPKG_ROOT "" CACHE PATH "Path to the vcpkg root directory.")
 if(NOT DEFINED VCPKG_TARGET_TRIPLET OR VCPKG_TARGET_TRIPLET STREQUAL "")
     if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")

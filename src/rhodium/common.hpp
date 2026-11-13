@@ -1,7 +1,7 @@
 ﻿/*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
  */
 
 #pragma once

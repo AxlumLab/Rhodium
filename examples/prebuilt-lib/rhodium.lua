@@ -1,3 +1,9 @@
+--[[
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+]]
+
 package("prebuilt-lib-example")
 version("0.1.0")
 default_config("debug")

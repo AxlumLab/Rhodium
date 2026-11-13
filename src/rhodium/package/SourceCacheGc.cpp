@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/package/ArtifactGc.hpp"
 #include "rhodium/package/CacheReferences.hpp"
 #include "rhodium/package/GitFetcher.hpp"

@@ -1,3 +1,9 @@
+--[[
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+]]
+
 package("basic-cmake")
 version("0.1.0")
 default_config("debug")

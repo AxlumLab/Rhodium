@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 set -euo pipefail
 
 build_type="${BUILD_TYPE:-Release}"

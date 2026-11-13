@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 find_package(Lua REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)

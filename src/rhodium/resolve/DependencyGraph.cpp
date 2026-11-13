@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/resolve/DependencyGraph.hpp"
 
 #include "rhodium/diagnostics/DiagnosticSink.hpp"

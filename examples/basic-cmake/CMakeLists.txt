@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 cmake_minimum_required(VERSION 3.25)
 project(rhodium_basic_cmake LANGUAGES CXX)
 

@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 param(
     [string]$BuildDir = "",
     [string]$BuildType = "Release",

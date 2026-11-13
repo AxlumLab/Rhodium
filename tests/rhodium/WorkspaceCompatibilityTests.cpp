@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/cli/Commands.hpp"
 #include "rhodium/config/DependencyOverrideFile.hpp"
 #include "rhodium/config/JsonModelWriter.hpp"

@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 set(_rhodium_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/Rhodium")
 
 install(TARGETS rhodium_core

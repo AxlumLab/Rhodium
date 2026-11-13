@@ -1,3 +1,9 @@
+/*
+ * @Author: AxlumLab
+ * @LastEditors: AxlumLab
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+ */
+
 #include "rhodium/diagnostics/JsonDiagnosticSink.hpp"
 #include "rhodium/script/ManifestLoader.hpp"
 

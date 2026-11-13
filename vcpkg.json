@@ -1,7 +1,7 @@
 {
   "name": "rhodium",
   "builtin-baseline": "301856f5f2824f788a3ffa6332293861cccd23b4",
-  "version-string": "0.1.0",
+  "version-string": "0.1.3",
   "dependencies": [
     "lua",
     "sol2",

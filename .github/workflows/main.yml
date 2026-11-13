@@ -1,93 +1,160 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 name: CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
+    tags: ['[0-9]*.[0-9]*.[0-9]*']
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
-  build:
-    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
-    runs-on: ${{ matrix.os }}
-    continue-on-error: true
+  prepare:
+    name: Validate version and baseline
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      baseline: ${{ steps.metadata.outputs.baseline }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
+      - name: Read release metadata
+        id: metadata
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = json.loads(Path('vcpkg.json').read_text())
+          version = manifest['version-string']
+          baseline = manifest['builtin-baseline']
+          if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+              raise SystemExit('Expected a stable major.minor.patch version')
+          if not re.fullmatch(r'[0-9a-f]{40}', baseline):
+              raise SystemExit('Expected a full vcpkg baseline commit SHA')
+          cmake = Path('CMakeLists.txt').read_text()
+          if not re.search(r'project\(Rhodium\s+VERSION\s+' + re.escape(version) + r'\s', cmake):
+              raise SystemExit('CMake and vcpkg manifest versions must match')
+          if os.environ['GITHUB_REF_TYPE'] == 'tag' and os.environ['GITHUB_REF_NAME'] != version:
+              raise SystemExit('Release tag must exactly match the project version (no v prefix)')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\nbaseline={baseline}\n')
+          PY
+
+      - name: Require release commit on main
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: git merge-base --is-ancestor HEAD origin/main
+
+  build:
+    name: ${{ matrix.slug }} Release
+    needs: prepare
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            compiler: msvc
-            build_type: Release
             triplet: x64-windows
             slug: windows-msvc
           - os: ubuntu-latest
-            compiler: gcc
-            build_type: Release
             triplet: x64-linux
             cc: gcc
             cxx: g++
             slug: linux-gcc
-          - os: ubuntu-latest
-            compiler: clang
-            build_type: Release
-            triplet: x64-linux
-            cc: clang
-            cxx: clang++
-            slug: linux-clang
           - os: macos-latest
-            compiler: clang
-            build_type: Release
-            triplet: x64-osx
+            triplet: arm64-osx
             cc: clang
             cxx: clang++
             slug: macos-clang
 
     env:
-      BUILD_TYPE: ${{ matrix.build_type }}
-      BUILD_DIR: ${{ github.workspace }}/out/build/${{ matrix.slug }}-${{ matrix.build_type }}
-      INSTALL_DIR: ${{ github.workspace }}/out/install/${{ matrix.slug }}-${{ matrix.build_type }}
+      BUILD_TYPE: Release
+      BUILD_DIR: ${{ github.workspace }}/out/build/${{ matrix.slug }}-Release
+      INSTALL_DIR: ${{ github.workspace }}/out/install/rhodium-${{ needs.prepare.outputs.version }}-${{ matrix.slug }}-${{ matrix.triplet }}
       VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+      VCPKG_BINARY_SOURCES: 'clear;files,${{ github.workspace }}/out/vcpkg-binary-cache,readwrite'
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Checkout vcpkg
+      # Port versions may refer to older Git trees: a shallow checkout is insufficient.
+      - name: Checkout vcpkg baseline and history
         uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
+          ref: ${{ needs.prepare.outputs.baseline }}
           path: vcpkg
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify baseline tree
+        shell: bash
+        env:
+          BASELINE: ${{ needs.prepare.outputs.baseline }}
+        run: git -C vcpkg cat-file -e "$BASELINE:versions/baseline.json"
+
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Verify build tools
+        shell: bash
+        run: |
+          cmake --version
+          ninja --version
 
       - name: Bootstrap vcpkg on Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\vcpkg\bootstrap-vcpkg.bat
+        run: |
+          .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Bootstrap vcpkg on Unix
         if: runner.os != 'Windows'
         shell: bash
-        run: ./vcpkg/bootstrap-vcpkg.sh
+        run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Cache vcpkg downloads
+      - name: Cache vcpkg binaries and downloads
         uses: actions/cache@v4
         with:
           path: |
             vcpkg/downloads
-            vcpkg/buildtrees
-            vcpkg/packages
-          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+            out/vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.triplet }}-
+            vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ matrix.slug }}-${{ matrix.triplet }}-
 
       - name: Build on Windows
-        id: build_windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\scripts\build.ps1 -BuildDir $env:BUILD_DIR -BuildType $env:BUILD_TYPE -VcpkgRoot "${{ github.workspace }}\vcpkg" -VcpkgTriplet $env:VCPKG_TARGET_TRIPLET
+        run: .\scripts\build.ps1 -BuildDir $env:BUILD_DIR -BuildType $env:BUILD_TYPE -VcpkgRoot "$env:GITHUB_WORKSPACE\vcpkg" -VcpkgTriplet $env:VCPKG_TARGET_TRIPLET
 
       - name: Build on Unix
-        id: build_unix
         if: runner.os != 'Windows'
         shell: bash
         env:
@@ -97,64 +164,87 @@ jobs:
         run: bash scripts/build.sh
 
       - name: Install package
-        id: install_package
-        if: >-
-          ${{
-            (runner.os == 'Windows' && steps.build_windows.outcome == 'success') ||
-            (runner.os != 'Windows' && steps.build_unix.outcome == 'success')
-          }}
         shell: bash
         run: cmake --install "$BUILD_DIR" --config "$BUILD_TYPE" --prefix "$INSTALL_DIR"
 
-      - name: Upload package
-        id: upload_package
-        if: steps.install_package.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rhodium-${{ matrix.slug }}-${{ matrix.build_type }}
-          path: ${{ env.INSTALL_DIR }}
-          if-no-files-found: error
+      - name: Smoke check installed CLI
+        shell: bash
+        run: '"$INSTALL_DIR/bin/rhodium" --version'
 
-      - name: Write job status
-        if: always()
+      - name: Archive installed package
         shell: bash
         run: |
-          mkdir -p ci-status
-          if [[ "${{ steps.upload_package.outcome }}" == "success" ]]; then
-            echo "${{ matrix.slug }}" > "ci-status/success.txt"
+          mkdir -p dist
+          package_name="$(basename "$INSTALL_DIR")"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmake -E chdir "$INSTALL_DIR/.." cmake -E tar cf "$GITHUB_WORKSPACE/dist/$package_name.zip" --format=zip "$package_name"
           else
-            echo "${{ matrix.slug }}" > "ci-status/failure.txt"
+            tar -czf "dist/$package_name.tar.gz" -C "$INSTALL_DIR/.." "$package_name"
           fi
 
-      - name: Upload job status
-        if: always()
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: ci-status-${{ matrix.slug }}
-          path: ci-status
+          name: rhodium-${{ needs.prepare.outputs.version }}-${{ matrix.slug }}-${{ matrix.triplet }}
+          path: dist/*
           if-no-files-found: error
 
   ci-summary:
     name: CI summary
     runs-on: ubuntu-latest
-    needs: build
+    needs: [prepare, build]
     if: always()
-
     steps:
-      - name: Download job status
+      - name: Require every package job to succeed
+        shell: bash
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          echo "metadata: $PREPARE_RESULT; package jobs: $BUILD_RESULT"
+          [[ "$PREPARE_RESULT" == "success" && "$BUILD_RESULT" == "success" ]]
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, build, ci-summary]
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download release packages
         uses: actions/download-artifact@v4
         with:
-          pattern: ci-status-*
-          path: ci-status
-          merge-multiple: false
+          pattern: rhodium-${{ needs.prepare.outputs.version }}-*
+          path: dist
+          merge-multiple: true
 
-      - name: Require at least one successful package
+      - name: Check packages and generate checksums
         shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          success_count="$(find ci-status -name success.txt -print | wc -l | tr -d ' ')"
-          echo "successful package jobs: ${success_count}"
-          find ci-status -type f -print -exec cat {} \;
-          if [[ "${success_count}" == "0" ]]; then
-            echo "No package job produced an installable artifact."
-            exit 1
+          cd dist
+          for package in "rhodium-$VERSION-windows-msvc-x64-windows.zip" "rhodium-$VERSION-linux-gcc-x64-linux.tar.gz" "rhodium-$VERSION-macos-clang-arm64-osx.tar.gz"; do
+            test -s "$package"
+          done
+          sha256sum *.zip *.tar.gz > SHA256SUMS
+
+      - name: Publish release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/* --verify-tag --draft --title "Rhodium $RELEASE_TAG" --generate-notes
           fi
+          gh release edit "$RELEASE_TAG" --draft=false

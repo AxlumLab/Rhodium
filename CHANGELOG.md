@@ -2,6 +2,15 @@
 
 This project follows a human-maintained changelog. Record user-visible changes only; internal-only refactors may be grouped under "Internal".
 
+## 0.1.3
+
+- Fixed CI vcpkg baseline resolution by checking out the pinned baseline with full history.
+- Build installable Windows MSVC, Linux GCC, and macOS ARM64 Clang packages; removed Linux Clang.
+- Publish tagged versions automatically as GitHub Releases with archives and SHA-256 checksums.
+- Added static/shared library installs and CMake package exports.
+- Default new lockfiles to `rhodium.lock.toml`, retaining legacy lockfile compatibility.
+- Updated the organization name and copyright headers to AxlumLab.
+
 ## Unreleased
 
 ### Documentation

@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 cmake_minimum_required(VERSION 3.25)
 
 option(BUILD_SHARED_LIBS "Build Rhodium as a shared library" OFF)
@@ -6,7 +10,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(cmake/RhodiumVcpkg.cmake)
 endif()
 
-project(Rhodium VERSION 0.1.2 LANGUAGES C CXX)
+project(Rhodium VERSION 0.1.3 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

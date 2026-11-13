@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 # FindLibArchive exposes a single location. vcpkg installs both CRT variants;
 # select the matching library for each multi-config build configuration.
 if(WIN32 AND TARGET LibArchive::LibArchive AND VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)

@@ -1,7 +1,7 @@
 <!--
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
 -->
 # Exit codes
 

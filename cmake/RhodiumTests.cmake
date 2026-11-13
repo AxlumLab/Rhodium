@@ -1,3 +1,7 @@
+# @Author: AxlumLab
+# @LastEditors: AxlumLab
+# Copyright (c) 2026 by AxlumLab, All Rights Reserved.
+
 find_package(GTest CONFIG REQUIRED)
 
 set(RHODIUM_TEST_SOURCES
