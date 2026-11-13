@@ -43,7 +43,7 @@ Choose a profile ID shown by `sdk list`, for example `windows-msvc-x64`.
 rhodium restore --config debug --toolchain windows-msvc-x64
 ```
 
-This reads `rhodium.lua`, fetches dependency sources, builds dependencies if needed, writes or updates `tpkg.lock.toml`, and stores artifacts under `.rhodium/`.
+This reads `rhodium.lua`, fetches dependency sources, builds dependencies if needed, writes or updates `rhodium.lock.toml`, and stores artifacts under `.rhodium/`.
 
 ## 4. Generate CMake integration
 
@@ -75,7 +75,7 @@ Commit:
 
 ```text
 rhodium.lua
-tpkg.lock.toml
+rhodium.lock.toml
 CMakeLists.txt
 ```
 

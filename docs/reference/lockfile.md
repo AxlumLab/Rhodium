@@ -1,10 +1,10 @@
 # Lockfile
 
-`tpkg.lock.toml` records resolved dependency state.
+`rhodium.lock.toml` records resolved dependency state. New workspaces use this name. Existing `tpkg.lock.toml` files remain supported and are reused when `rhodium.lock.toml` is absent; when both exist, `rhodium.lock.toml` takes precedence. To migrate an existing project, rename its `tpkg.lock.toml` to `rhodium.lock.toml`.
 
 ## Commit policy
 
-Commit `tpkg.lock.toml` for applications and projects that need reproducible dependency restore.
+Commit `rhodium.lock.toml` for applications and projects that need reproducible dependency restore.
 
 ## Locked restore
 

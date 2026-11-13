@@ -23,7 +23,7 @@ Use the lockfile exactly:
 rhodium restore --locked
 ```
 
-`--locked` should not update `tpkg.lock.toml`.
+`--locked` should not update `rhodium.lock.toml`.
 
 ## Build-only and export-only
 
@@ -53,5 +53,5 @@ Restore may update:
 .rhodium/packages/
 .rhodium/build-packages/
 .rhodium/artifacts/
-tpkg.lock.toml
+rhodium.lock.toml
 ```

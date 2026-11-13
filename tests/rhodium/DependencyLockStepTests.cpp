@@ -2,9 +2,10 @@
 
 #include <gtest/gtest.h>
 
-namespace
+namespace rhodium::tests::dependencyLockStepTests
 {
-    rhodium::LockedPackage entry(const std::string &ref, const std::string &config = "debug", const std::string &toolchain = "one")
+    rhodium::LockedPackage entry(const std::string &ref, const std::string &config = "debug",
+                                 const std::string &toolchain = "one")
     {
         rhodium::DependencyDesc dependency;
         dependency.name = "Example";
@@ -44,4 +45,4 @@ namespace
         EXPECT_EQ(lock.packages[0].ref, "v2");
         EXPECT_EQ(lock.packages[1].config, "release");
     }
-}
+} // namespace rhodium::tests::dependencyLockStepTests

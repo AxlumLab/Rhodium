@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <string>
 
-namespace
+namespace rhodium::tests::dependencyBuildStepTests
 {
     class DependencyBuildStepTests : public ::testing::Test
     {
@@ -33,7 +33,8 @@ namespace
             profile.id = toolchainId;
             profile.platform = "linux";
             profile.compilerKind = "gcc";
-            profile.compiler = profile.cxxCompiler = profile.linker = profile.archiver = profile.ninja = root / "dummy-tool";
+            profile.compiler = profile.cxxCompiler = profile.linker = profile.archiver = profile.ninja =
+                root / "dummy-tool";
             ASSERT_TRUE(rhodium::ToolchainRegistry::write(root / "config/toolchains.toml", {profile}, diagnostics));
 
             dependency.name = "Example";
@@ -67,7 +68,9 @@ namespace
             const std::string config = "debug";
             const std::string toolchain = toolchainId;
             rhodium::DepBuild::Context context{root, cache, config, toolchain, options};
-            return rhodium::DepBuild::run(rhodium::DepBuild::Request{dependency, root / "source", commit, nullptr, false}, context, result, diagnostics);
+            return rhodium::DepBuild::run(
+                rhodium::DepBuild::Request{dependency, root / "source", commit, nullptr, false}, context, result,
+                diagnostics);
         }
     };
 
@@ -167,6 +170,7 @@ namespace
         options.toolchains = &nextRestore;
         dependency.name = "Third";
         EXPECT_FALSE(run("commit-a", result));
-        EXPECT_NE(diagnostics.diagnostics().dump().find("requested toolchain was not detected: " + toolchainId), std::string::npos);
+        EXPECT_NE(diagnostics.diagnostics().dump().find("requested toolchain was not detected: " + toolchainId),
+                  std::string::npos);
     }
-}
+} // namespace rhodium::tests::dependencyBuildStepTests

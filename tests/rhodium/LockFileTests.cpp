@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <chrono>
 
-namespace
+namespace rhodium::tests::lockFileTests
 {
 
     TEST(LockFileTests, WritesAndReadsPackages)
@@ -16,7 +16,7 @@ namespace
         const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
         const auto dir = std::filesystem::temp_directory_path() / ("rhodium-lock-" + std::to_string(stamp));
         std::filesystem::create_directories(dir);
-        const auto path = dir / "tpkg.lock.toml";
+        const auto path = dir / "rhodium.lock.toml";
 
         rhodium::LockFile lock;
         rhodium::LockedPackage package;
@@ -108,10 +108,12 @@ namespace
         lock.packages.push_back(package);
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::LockFile::write(dir / "tpkg.lock.toml", lock, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::write(dir / "rhodium.lock.toml", lock, diagnostics))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LockFile loaded;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", loaded, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", loaded, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(loaded.packages.size(), 1u);
         EXPECT_EQ(loaded.packages[0].config, "debug");
         EXPECT_EQ(loaded.packages[0].toolchainId, "android-clang-arm64");
@@ -162,8 +164,10 @@ namespace
         dependency.ref = "10.2.1";
         dependency.buildType = "cmake";
 
-        const auto first = rhodium::LockedPackage::from(dependency, "abcdef", "debug", "windows-msvc-x64", "toolchain-content-a");
-        const auto second = rhodium::LockedPackage::from(dependency, "abcdef", "debug", "windows-msvc-x64", "toolchain-content-b");
+        const auto first =
+            rhodium::LockedPackage::from(dependency, "abcdef", "debug", "windows-msvc-x64", "toolchain-content-a");
+        const auto second =
+            rhodium::LockedPackage::from(dependency, "abcdef", "debug", "windows-msvc-x64", "toolchain-content-b");
 
         EXPECT_NE(first.buildHash, second.buildHash);
         EXPECT_NE(first.artifactId, second.artifactId);
@@ -196,7 +200,7 @@ namespace
         const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
         const auto dir = std::filesystem::temp_directory_path() / ("rhodium-lock-archive-" + std::to_string(stamp));
         std::filesystem::create_directories(dir);
-        const auto path = dir / "tpkg.lock.toml";
+        const auto path = dir / "rhodium.lock.toml";
 
         rhodium::LockFile lock;
         rhodium::LockedPackage package;
@@ -249,4 +253,4 @@ namespace
         EXPECT_NE(first.artifactId, second.artifactId);
     }
 
-} // namespace
+} // namespace rhodium::tests::lockFileTests

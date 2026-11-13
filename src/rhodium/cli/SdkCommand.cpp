@@ -90,10 +90,7 @@ namespace rhodium
         static bool hasLibDir(const ToolchainProfile &profile, const std::string &needle)
         {
             return std::any_of(profile.systemLibDirs.begin(), profile.systemLibDirs.end(),
-                               [&](const auto &dir)
-                               {
-                                   return pathHas(dir, needle);
-                               });
+                               [&](const auto &dir) { return pathHas(dir, needle); });
         }
 
         static std::string cxx(const ToolchainProfile &profile)
@@ -191,11 +188,8 @@ namespace rhodium
 
         static bool hasAndroidProfile(const std::vector<ToolchainProfile> &profiles)
         {
-            return std::any_of(profiles.begin(), profiles.end(),
-                               [](const auto &profile)
-                               {
-                                   return profile.platform == "android" || profile.id.rfind("android-", 0) == 0;
-                               });
+            return std::any_of(profiles.begin(), profiles.end(), [](const auto &profile)
+                               { return profile.platform == "android" || profile.id.rfind("android-", 0) == 0; });
         }
 
         static bool msvcProbe(const ToolchainProfile &profile, std::string &output)
@@ -341,10 +335,7 @@ namespace rhodium
         {
             auto text = path.generic_string();
             std::transform(text.begin(), text.end(), text.begin(),
-                           [](unsigned char c)
-                           {
-                               return static_cast<char>(std::tolower(c));
-                           });
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
             return text.find(needle) != std::string::npos;
         }
 
@@ -367,126 +358,119 @@ namespace rhodium
         }
     };
 
-    namespace
+    class SdkReport final
     {
-        class SdkReport final
+    public:
+        static void android(const ToolchainProfile &profile)
         {
-        public:
-            static void android(const ToolchainProfile &profile)
+            LogInfo("  android_sdk_root: {}", profile.androidSdkRoot.empty() ? "-" : profile.androidSdkRoot.string());
+            LogInfo("  android_ndk_root: {}", profile.androidNdkRoot.empty() ? "-" : profile.androidNdkRoot.string());
+            LogInfo("  jdk_root: {}", profile.jdkRoot.empty() ? "-" : profile.jdkRoot.string());
+            LogInfo("  android_api: {}", profile.androidApi.empty() ? "-" : profile.androidApi);
+            LogInfo("  android_abi: {}", profile.androidAbi.empty() ? "-" : profile.androidAbi);
+            LogInfo("  target_triple: {}", profile.targetTriple.empty() ? "-" : profile.targetTriple);
+            const auto hostPrebuilt = profile.androidNdkRoot.empty()
+                                          ? std::filesystem::path{}
+                                          : profile.androidNdkRoot / "toolchains" / "llvm" / "prebuilt";
+            LogInfo("  host_prebuilt: {}", hostPrebuilt.empty() ? "-" : hostPrebuilt.string());
+            const auto sysroot = SdkCli::androidSysroot(profile);
+            LogInfo("  sysroot: {}", sysroot.empty() ? "-" : sysroot.string());
+            const auto compilerName = profile.compiler.filename().string();
+            const auto compilerMode =
+                !profile.targetTriple.empty() && compilerName.find(profile.targetTriple) != std::string::npos
+                    ? "wrapper"
+                    : "clang-with-target";
+            LogInfo("  compiler_mode: {}", profile.compiler.empty() ? "-" : compilerMode);
+            LogInfo("  compiler: {}", profile.compiler.empty() ? "-" : profile.compiler.string());
+            LogInfo("  cxx_compiler: {}", profile.cxxCompiler.empty() ? "-" : profile.cxxCompiler.string());
+            LogInfo("  archiver: {}", profile.archiver.empty() ? "-" : profile.archiver.string());
+            LogInfo("  adb: {}", profile.adb.empty() ? "-" : profile.adb.string());
+            LogInfo("  java: {}", profile.java.empty() ? "-" : profile.java.string());
+            LogInfo("  javac: {}", profile.javac.empty() ? "-" : profile.javac.string());
+            LogInfo("  gradle: {}", profile.gradle.empty() ? "-" : profile.gradle.string());
+        }
+
+        static bool probe(const ToolchainProfile &profile)
+        {
+            bool ok = true;
+            if (profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl")
             {
-                LogInfo("  android_sdk_root: {}",
-                        profile.androidSdkRoot.empty() ? "-" : profile.androidSdkRoot.string());
-                LogInfo("  android_ndk_root: {}",
-                        profile.androidNdkRoot.empty() ? "-" : profile.androidNdkRoot.string());
-                LogInfo("  jdk_root: {}", profile.jdkRoot.empty() ? "-" : profile.jdkRoot.string());
-                LogInfo("  android_api: {}", profile.androidApi.empty() ? "-" : profile.androidApi);
-                LogInfo("  android_abi: {}", profile.androidAbi.empty() ? "-" : profile.androidAbi);
-                LogInfo("  target_triple: {}", profile.targetTriple.empty() ? "-" : profile.targetTriple);
-                const auto hostPrebuilt = profile.androidNdkRoot.empty()
-                                              ? std::filesystem::path{}
-                                              : profile.androidNdkRoot / "toolchains" / "llvm" / "prebuilt";
-                LogInfo("  host_prebuilt: {}", hostPrebuilt.empty() ? "-" : hostPrebuilt.string());
-                const auto sysroot = SdkCli::androidSysroot(profile);
-                LogInfo("  sysroot: {}", sysroot.empty() ? "-" : sysroot.string());
-                const auto compilerName = profile.compiler.filename().string();
-                const auto compilerMode =
-                    !profile.targetTriple.empty() && compilerName.find(profile.targetTriple) != std::string::npos
-                        ? "wrapper"
-                        : "clang-with-target";
-                LogInfo("  compiler_mode: {}", profile.compiler.empty() ? "-" : compilerMode);
-                LogInfo("  compiler: {}", profile.compiler.empty() ? "-" : profile.compiler.string());
-                LogInfo("  cxx_compiler: {}", profile.cxxCompiler.empty() ? "-" : profile.cxxCompiler.string());
-                LogInfo("  archiver: {}", profile.archiver.empty() ? "-" : profile.archiver.string());
-                LogInfo("  adb: {}", profile.adb.empty() ? "-" : profile.adb.string());
-                LogInfo("  java: {}", profile.java.empty() ? "-" : profile.java.string());
-                LogInfo("  javac: {}", profile.javac.empty() ? "-" : profile.javac.string());
-                LogInfo("  gradle: {}", profile.gradle.empty() ? "-" : profile.gradle.string());
+                LogInfo("  has vc lib: {}", SdkCli::hasLibDir(profile, "/vc/tools/msvc/") ? "yes" : "no");
+                LogInfo("  has ucrt lib: {}", SdkCli::hasLibDir(profile, "/ucrt/") ? "yes" : "no");
+                LogInfo("  has um lib: {}", SdkCli::hasLibDir(profile, "/um/") ? "yes" : "no");
+                std::string probeOutput;
+                const bool probeOk = SdkCli::msvcProbe(profile, probeOutput);
+                ok &= probeOk;
+                LogInfo("  runtime_link_probe: {}", probeOk ? "ok" : "failed");
+                if (!probeOk && !probeOutput.empty())
+                {
+                    LogInfo("  runtime_link_probe_output: {}", probeOutput);
+                }
+            }
+            else if (profile.platform == "android" || profile.sdkKind == "android-ndk")
+            {
+                std::string probeOutput;
+                const bool probeOk = SdkCli::androidProbe(profile, probeOutput);
+                ok &= probeOk;
+                LogInfo("  compile_probe: {}", probeOk ? "ok" : "failed");
+                if (!probeOk && !probeOutput.empty())
+                {
+                    LogInfo("  compile_probe_output: {}", probeOutput);
+                }
+            }
+            return ok;
+        }
+
+        static bool profile(const LoadedToolchainProfile &loaded)
+        {
+            bool ok = true;
+            const auto &profile = loaded.profile;
+            SdkCli::print(profile);
+            LogInfo("  source: {}", ToolchainRegistry::name(loaded.source));
+            LogInfo("  source_file: {}", loaded.sourceFile.string());
+            if (!loaded.overridden.empty())
+            {
+                LogInfo("  overrides:");
+                for (const auto &overridden : loaded.overridden)
+                {
+                    LogInfo("    {}: {}", ToolchainRegistry::name(overridden.source), overridden.sourceFile.string());
+                }
             }
 
-            static bool probe(const ToolchainProfile &profile)
+            LogInfo("  include_dirs: {}", profile.systemIncludeDirs.size());
+            LogInfo("  lib_dirs: {}", profile.systemLibDirs.size());
+            LogInfo("  bin_dirs: {}", profile.binaryDirs.size());
+
+            LogInfo("  git: {}", fmt::styled(profile.git.empty() ? std::string("missing") : profile.git.string(),
+                                             fmt::fg(profile.git.empty() ? fmt::color::red : fmt::color::green)));
+
+            LogInfo("  ninja: {}", fmt::styled(profile.ninja.empty() ? std::string("missing") : profile.ninja.string(),
+                                               fmt::fg(profile.ninja.empty() ? fmt::color::red : fmt::color::green)));
+
+            if (profile.git.empty())
             {
-                bool ok = true;
-                if (profile.compilerKind == "msvc" || profile.compilerKind == "clang-cl")
-                {
-                    LogInfo("  has vc lib: {}", SdkCli::hasLibDir(profile, "/vc/tools/msvc/") ? "yes" : "no");
-                    LogInfo("  has ucrt lib: {}", SdkCli::hasLibDir(profile, "/ucrt/") ? "yes" : "no");
-                    LogInfo("  has um lib: {}", SdkCli::hasLibDir(profile, "/um/") ? "yes" : "no");
-                    std::string probeOutput;
-                    const bool probeOk = SdkCli::msvcProbe(profile, probeOutput);
-                    ok &= probeOk;
-                    LogInfo("  runtime_link_probe: {}", probeOk ? "ok" : "failed");
-                    if (!probeOk && !probeOutput.empty())
-                    {
-                        LogInfo("  runtime_link_probe_output: {}", probeOutput);
-                    }
-                }
-                else if (profile.platform == "android" || profile.sdkKind == "android-ndk")
-                {
-                    std::string probeOutput;
-                    const bool probeOk = SdkCli::androidProbe(profile, probeOutput);
-                    ok &= probeOk;
-                    LogInfo("  compile_probe: {}", probeOk ? "ok" : "failed");
-                    if (!probeOk && !probeOutput.empty())
-                    {
-                        LogInfo("  compile_probe_output: {}", probeOutput);
-                    }
-                }
-                return ok;
+                ok = false;
+                LogInfo("  git_required: dependency restore and source acquisition may fail");
             }
-
-            static bool profile(const LoadedToolchainProfile &loaded)
+            if (profile.ninja.empty())
             {
-                bool ok = true;
-                const auto &profile = loaded.profile;
-                SdkCli::print(profile);
-                LogInfo("  source: {}", ToolchainRegistry::name(loaded.source));
-                LogInfo("  source_file: {}", loaded.sourceFile.string());
-                if (!loaded.overridden.empty())
-                {
-                    LogInfo("  overrides:");
-                    for (const auto &overridden : loaded.overridden)
-                    {
-                        LogInfo("    {}: {}", ToolchainRegistry::name(overridden.source),
-                                overridden.sourceFile.string());
-                    }
-                }
-
-                LogInfo("  include_dirs: {}", profile.systemIncludeDirs.size());
-                LogInfo("  lib_dirs: {}", profile.systemLibDirs.size());
-                LogInfo("  bin_dirs: {}", profile.binaryDirs.size());
-
-                LogInfo("  git: {}", fmt::styled(profile.git.empty() ? std::string("missing") : profile.git.string(),
-                                                 fmt::fg(profile.git.empty() ? fmt::color::red : fmt::color::green)));
-
-                LogInfo("  ninja: {}",
-                        fmt::styled(profile.ninja.empty() ? std::string("missing") : profile.ninja.string(),
-                                    fmt::fg(profile.ninja.empty() ? fmt::color::red : fmt::color::green)));
-
-                if (profile.git.empty())
-                {
-                    ok = false;
-                    LogInfo("  git_required: dependency restore and source acquisition may fail");
-                }
-                if (profile.ninja.empty())
-                {
-                    ok = false;
-                    LogInfo("  ninja_required: package builds may fail");
-                }
-                if (profile.platform == "android")
-                {
-                    android(profile);
-                }
-                if (profile.platform == "macos" || profile.platform == "ios")
-                {
-                    LogInfo("  libtool: {}", profile.libtool.empty() ? "-" : profile.libtool.string());
-                    LogInfo("  lipo: {}", profile.lipo.empty() ? "-" : profile.lipo.string());
-                    LogInfo("  codesign: {}", profile.codesign.empty() ? "-" : profile.codesign.string());
-                }
-                ok &= probe(profile);
-                return ok;
+                ok = false;
+                LogInfo("  ninja_required: package builds may fail");
             }
-        };
-    }
+            if (profile.platform == "android")
+            {
+                android(profile);
+            }
+            if (profile.platform == "macos" || profile.platform == "ios")
+            {
+                LogInfo("  libtool: {}", profile.libtool.empty() ? "-" : profile.libtool.string());
+                LogInfo("  lipo: {}", profile.lipo.empty() ? "-" : profile.lipo.string());
+                LogInfo("  codesign: {}", profile.codesign.empty() ? "-" : profile.codesign.string());
+            }
+            ok &= probe(profile);
+            return ok;
+        }
+    };
 
     bool SdkDoctor::print(const std::filesystem::path &workspaceRoot)
     {
@@ -554,61 +538,57 @@ namespace rhodium
         return profiles.empty() ? 1 : 0;
     }
 
-    namespace
+    class SdkTable final
     {
-        class SdkTable final
+    public:
+        static void print(const std::vector<LoadedToolchainProfile> &loadedProfiles,
+                          const LocalToolchainConfig &localConfig)
         {
-        public:
-            static void print(const std::vector<LoadedToolchainProfile> &loadedProfiles,
-                              const LocalToolchainConfig &localConfig)
+            std::size_t idWidth = std::string("id").size();
+            std::size_t platformWidth = std::string("platform").size();
+            std::size_t hostWidth = std::string("host").size();
+            std::size_t targetWidth = std::string("target").size();
+            std::size_t abiWidth = std::string("abi").size();
+            std::size_t apiWidth = std::string("api").size();
+            std::size_t sourceWidth = std::string("source").size();
+            for (const auto &loaded : loadedProfiles)
             {
-                std::size_t idWidth = std::string("id").size();
-                std::size_t platformWidth = std::string("platform").size();
-                std::size_t hostWidth = std::string("host").size();
-                std::size_t targetWidth = std::string("target").size();
-                std::size_t abiWidth = std::string("abi").size();
-                std::size_t apiWidth = std::string("api").size();
-                std::size_t sourceWidth = std::string("source").size();
-                for (const auto &loaded : loadedProfiles)
-                {
-                    const auto &profile = loaded.profile;
-                    idWidth = (std::max)(idWidth, profile.id.size());
-                    platformWidth =
-                        (std::max)(platformWidth, profile.platform.empty() ? std::size_t{1} : profile.platform.size());
-                    hostWidth =
-                        (std::max)(hostWidth, profile.hostArch.empty() ? std::size_t{1} : profile.hostArch.size());
-                    targetWidth = (std::max)(targetWidth,
-                                             profile.targetArch.empty() ? std::size_t{1} : profile.targetArch.size());
-                    abiWidth =
-                        (std::max)(abiWidth, profile.androidAbi.empty() ? std::size_t{1} : profile.androidAbi.size());
-                    apiWidth =
-                        (std::max)(apiWidth, profile.androidApi.empty() ? std::size_t{1} : profile.androidApi.size());
-                    sourceWidth = (std::max)(sourceWidth, std::string(ToolchainRegistry::name(loaded.source)).size());
-                }
+                const auto &profile = loaded.profile;
+                idWidth = (std::max)(idWidth, profile.id.size());
+                platformWidth =
+                    (std::max)(platformWidth, profile.platform.empty() ? std::size_t{1} : profile.platform.size());
+                hostWidth = (std::max)(hostWidth, profile.hostArch.empty() ? std::size_t{1} : profile.hostArch.size());
+                targetWidth =
+                    (std::max)(targetWidth, profile.targetArch.empty() ? std::size_t{1} : profile.targetArch.size());
+                abiWidth =
+                    (std::max)(abiWidth, profile.androidAbi.empty() ? std::size_t{1} : profile.androidAbi.size());
+                apiWidth =
+                    (std::max)(apiWidth, profile.androidApi.empty() ? std::size_t{1} : profile.androidApi.size());
+                sourceWidth = (std::max)(sourceWidth, std::string(ToolchainRegistry::name(loaded.source)).size());
+            }
 
-                LogInfo("{:<2}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  status", "", "id", idWidth,
-                        "platform", platformWidth, "host", hostWidth, "target", targetWidth, "abi", abiWidth, "api",
-                        apiWidth, "source", sourceWidth);
-                for (const auto &loaded : loadedProfiles)
+            LogInfo("{:<2}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  status", "", "id", idWidth,
+                    "platform", platformWidth, "host", hostWidth, "target", targetWidth, "abi", abiWidth, "api",
+                    apiWidth, "source", sourceWidth);
+            for (const auto &loaded : loadedProfiles)
+            {
+                const auto &profile = loaded.profile;
+                const auto selected = profile.id == localConfig.preferredToolchain ? "*" : "";
+                LogInfo("{:<2}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {}", selected, profile.id,
+                        idWidth, profile.platform.empty() ? "-" : profile.platform, platformWidth,
+                        profile.hostArch.empty() ? "-" : profile.hostArch, hostWidth,
+                        profile.targetArch.empty() ? "-" : profile.targetArch, targetWidth,
+                        profile.androidAbi.empty() ? "-" : profile.androidAbi, abiWidth,
+                        profile.androidApi.empty() ? "-" : profile.androidApi, apiWidth,
+                        ToolchainRegistry::name(loaded.source), sourceWidth,
+                        profile.complete ? "complete" : "incomplete");
+                if (!profile.complete && !profile.missing.empty())
                 {
-                    const auto &profile = loaded.profile;
-                    const auto selected = profile.id == localConfig.preferredToolchain ? "*" : "";
-                    LogInfo("{:<2}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {:<{}}  {}", selected, profile.id,
-                            idWidth, profile.platform.empty() ? "-" : profile.platform, platformWidth,
-                            profile.hostArch.empty() ? "-" : profile.hostArch, hostWidth,
-                            profile.targetArch.empty() ? "-" : profile.targetArch, targetWidth,
-                            profile.androidAbi.empty() ? "-" : profile.androidAbi, abiWidth,
-                            profile.androidApi.empty() ? "-" : profile.androidApi, apiWidth,
-                            ToolchainRegistry::name(loaded.source), sourceWidth,
-                            profile.complete ? "complete" : "incomplete");
-                    if (!profile.complete && !profile.missing.empty())
-                    {
-                        LogInfo("    missing: {}", SdkCli::join(profile.missing, ", "));
-                    }
+                    LogInfo("    missing: {}", SdkCli::join(profile.missing, ", "));
                 }
             }
-        };
-    }
+        }
+    };
 
     int Commands::sdkList(const std::filesystem::path &workspaceRoot, bool refresh, const std::string &sourceFilter)
     {
@@ -650,10 +630,7 @@ namespace rhodium
                 return 1;
             }
             loadedProfiles.erase(std::remove_if(loadedProfiles.begin(), loadedProfiles.end(),
-                                                [&](const auto &profile)
-                                                {
-                                                    return profile.source != source;
-                                                }),
+                                                [&](const auto &profile) { return profile.source != source; }),
                                  loadedProfiles.end());
         }
         if (loadedProfiles.empty())
@@ -680,11 +657,8 @@ namespace rhodium
             return 1;
         }
         const auto profiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
-        const auto found = std::find_if(profiles.begin(), profiles.end(),
-                                        [&](const LoadedToolchainProfile &profile)
-                                        {
-                                            return profile.profile.id == id;
-                                        });
+        const auto found = std::find_if(profiles.begin(), profiles.end(), [&](const LoadedToolchainProfile &profile)
+                                        { return profile.profile.id == id; });
         if (found == profiles.end())
         {
             diagnostics.error("toolchain not found: " + id);
@@ -791,10 +765,7 @@ namespace rhodium
             return 1;
         }
         const auto existing = std::find_if(profiles.begin(), profiles.end(),
-                                           [&](const ToolchainProfile &item)
-                                           {
-                                               return item.id == profile.id;
-                                           });
+                                           [&](const ToolchainProfile &item) { return item.id == profile.id; });
         if (existing != profiles.end() && !options.force)
         {
             diagnostics.error("toolchain '" + profile.id + "' already exists in " +
@@ -844,10 +815,7 @@ namespace rhodium
         }
         const auto oldSize = profiles.size();
         profiles.erase(std::remove_if(profiles.begin(), profiles.end(),
-                                      [&](const ToolchainProfile &profile)
-                                      {
-                                          return profile.id == id;
-                                      }),
+                                      [&](const ToolchainProfile &profile) { return profile.id == id; }),
                        profiles.end());
         if (profiles.size() == oldSize)
         {
@@ -857,10 +825,7 @@ namespace rhodium
                 if (ToolchainRegistry::readUser(workspaceRoot, ToolchainSource::GlobalUser, globalProfiles,
                                                 diagnostics) &&
                     std::any_of(globalProfiles.begin(), globalProfiles.end(),
-                                [&](const ToolchainProfile &profile)
-                                {
-                                    return profile.id == id;
-                                }))
+                                [&](const ToolchainProfile &profile) { return profile.id == id; }))
                 {
                     diagnostics.error("toolchain '" + id + "' is in global-user toolchains; use --source global-user");
                     return 1;
@@ -916,10 +881,7 @@ namespace rhodium
         auto loadedProfiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
         auto profiles = ToolchainRegistry::profiles(loadedProfiles);
         auto found = std::find_if(profiles.begin(), profiles.end(),
-                                  [&](const ToolchainProfile &profile)
-                                  {
-                                      return profile.id == toolchainId;
-                                  });
+                                  [&](const ToolchainProfile &profile) { return profile.id == toolchainId; });
         if (found == profiles.end())
         {
             std::vector<ToolchainProfile> refreshed;
@@ -930,10 +892,7 @@ namespace rhodium
             loadedProfiles = ToolchainRegistry::load(workspaceRoot, diagnostics);
             profiles = ToolchainRegistry::profiles(loadedProfiles);
             found = std::find_if(profiles.begin(), profiles.end(),
-                                 [&](const ToolchainProfile &profile)
-                                 {
-                                     return profile.id == toolchainId;
-                                 });
+                                 [&](const ToolchainProfile &profile) { return profile.id == toolchainId; });
         }
         if (found == profiles.end())
         {

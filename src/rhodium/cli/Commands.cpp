@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
 #include "rhodium/cli/Commands.hpp"
@@ -64,85 +64,74 @@ namespace rhodium
                "\nor select a default toolchain:\n  rhodium sdk select " + toolchainId;
     }
 
-    namespace
+    std::string packageMetadataValue(const LockFile &lockFile, const std::string &config, const std::string &toolchainId, const std::string LockedPackage::*field)
     {
-        class PackageMetadata final
+        std::string value;
+        for (const auto &package : lockFile.packages)
         {
-        public:
-            static std::string value(const LockFile &lockFile, const std::string &config,
-                                     const std::string &toolchainId, const std::string LockedPackage::*field)
+            if (BuildConfig::normalize(package.config) != BuildConfig::normalize(config) ||
+                package.toolchainId != toolchainId)
             {
-                std::string value;
-                for (const auto &package : lockFile.packages)
-                {
-                    if (BuildConfig::normalize(package.config) != BuildConfig::normalize(config) ||
-                        package.toolchainId != toolchainId)
-                    {
-                        continue;
-                    }
-                    const auto &candidate = package.*field;
-                    if (candidate.empty() || candidate == "default")
-                    {
-                        continue;
-                    }
-                    if (value.empty())
-                    {
-                        value = candidate;
-                    }
-                    else if (value != candidate)
-                    {
-                        return "mixed";
-                    }
-                }
-                return value;
+                continue;
             }
-        };
+            const auto &candidate = package.*field;
+            if (candidate.empty() || candidate == "default")
+            {
+                continue;
+            }
+            if (value.empty())
+            {
+                value = candidate;
+            }
+            else if (value != candidate)
+            {
+                return "mixed";
+            }
+        }
+        return value;
     }
 
     std::string CliWorkspace::runtime(const LockFile &lockFile, const std::string &config,
                                       const std::string &toolchainId)
     {
-        return PackageMetadata::value(lockFile, config, toolchainId, &LockedPackage::runtime);
+        return packageMetadataValue(lockFile, config, toolchainId, &LockedPackage::runtime);
     }
 
     std::string CliWorkspace::linkage(const LockFile &lockFile, const std::string &config,
                                       const std::string &toolchainId)
     {
-        return PackageMetadata::value(lockFile, config, toolchainId, &LockedPackage::linkage);
+        return packageMetadataValue(lockFile, config, toolchainId, &LockedPackage::linkage);
     }
 
-    namespace
+    class CliToolchainCheck final
     {
-        class CliToolchainCheck final
+    public:
+        static bool complete(const ToolchainProfile &profile, DiagnosticSink &diagnostics, bool allowIncomplete)
         {
-        public:
-            static bool complete(const ToolchainProfile &profile, DiagnosticSink &diagnostics, bool allowIncomplete)
+            if (profile.complete)
             {
-                if (profile.complete)
-                {
-                    return true;
-                }
-                if (allowIncomplete)
-                {
-                    diagnostics.warning("using incomplete toolchain: " + profile.id);
-                    return true;
-                }
-                std::ostringstream missing;
-                for (std::size_t i = 0; i < profile.missing.size(); ++i)
-                {
-                    if (i != 0)
-                    {
-                        missing << ", ";
-                    }
-                    missing << profile.missing[i];
-                }
-                diagnostics.error("toolchain " + profile.id + " is incomplete\nmissing: " +
-                                  (profile.missing.empty() ? std::string("-") : missing.str()) +
-                                  "\nrun:\n  rhodium sdk doctor");
-                return false;
+                return true;
             }
-        };
-    }
+            if (allowIncomplete)
+            {
+                diagnostics.warning("using incomplete toolchain: " + profile.id);
+                return true;
+            }
+            std::ostringstream missing;
+            for (std::size_t i = 0; i < profile.missing.size(); ++i)
+            {
+                if (i != 0)
+                {
+                    missing << ", ";
+                }
+                missing << profile.missing[i];
+            }
+            diagnostics.error("toolchain " + profile.id + " is incomplete\nmissing: " +
+                              (profile.missing.empty() ? std::string("-") : missing.str()) +
+                              "\nrun:\n  rhodium sdk doctor");
+            return false;
+        }
+    };
 
     bool CliWorkspace::selectToolchain(const std::filesystem::path &workspaceRoot, const std::string &toolchainId,
                                        ToolchainProfile &selectedToolchain, DiagnosticSink &diagnostics)

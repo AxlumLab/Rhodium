@@ -6,6 +6,7 @@
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
+#include "rhodium/core/Path.hpp"
 #include "rhodium/core/Logger.hpp"
 #include "rhodium/core/WorkspaceLock.hpp"
 
@@ -33,7 +34,7 @@ namespace rhodium
         }
 
         LockFile lockFile;
-        if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
+        if (!LockFile::read(Path::lockFile(workspaceRoot), lockFile, diagnostics))
         {
             return 1;
         }

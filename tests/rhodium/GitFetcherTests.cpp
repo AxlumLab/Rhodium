@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace
+namespace rhodium::tests::gitFetcherTests
 {
     class GitFetcherTests : public ::testing::Test
     {
@@ -26,7 +26,8 @@ namespace
 
         bool git(const std::filesystem::path &repo, const std::vector<std::string> &args)
         {
-            std::vector<std::string> command{"-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-C", repo.string()};
+            std::vector<std::string> command{
+                "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-C", repo.string()};
             command.insert(command.end(), args.begin(), args.end());
             const auto result = rhodium::Process::run("git", command);
             output = result.output;
@@ -115,8 +116,11 @@ namespace
         ASSERT_TRUE(git(child, {"config", "user.email", "test@example.invalid"}));
         ASSERT_TRUE(git(child, {"add", "."}));
         ASSERT_TRUE(git(child, {"commit", "-m", "child"})) << output;
-        ASSERT_TRUE(git(source, {"-c", "protocol.file.allow=always", "submodule", "add", child.string(), "vendor/child"})) << output;
-        ASSERT_TRUE(git(source, {"config", "-f", ".gitmodules", "submodule.vendor/child.url", (root / "missing-submodule").string()}));
+        ASSERT_TRUE(
+            git(source, {"-c", "protocol.file.allow=always", "submodule", "add", child.string(), "vendor/child"}))
+            << output;
+        ASSERT_TRUE(git(source, {"config", "-f", ".gitmodules", "submodule.vendor/child.url",
+                                 (root / "missing-submodule").string()}));
         ASSERT_TRUE(git(source, {"add", "."}));
         ASSERT_TRUE(git(source, {"commit", "-m", "add broken submodule URL"})) << output;
 
@@ -143,7 +147,8 @@ namespace
         package.source = rhodium::DepLock::source(root, dependency);
         rhodium::LockFile lock;
         lock.packages.push_back(package);
-        ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lock, root, true, {}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ArtifactGc::runSourceCaches(lock, root, true, {}, diagnostics))
+            << diagnostics.diagnostics().dump();
         EXPECT_TRUE(std::filesystem::is_directory(live / ".git"));
         EXPECT_FALSE(std::filesystem::exists(stale));
     }
@@ -183,8 +188,9 @@ namespace
         rhodium::PackageCache cache(root / ".rhodium/packages");
         const auto debugSource = cache.source(dependency);
         model.rootPackage.dependencies[0].ref = "release";
-        ASSERT_TRUE(resolver.restore(model, root, diagnostics, rhodium::DependencyRestoreRequest{{}, "release"})) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(resolver.restore(model, root, diagnostics, rhodium::DependencyRestoreRequest{{}, "release"}))
+            << diagnostics.diagnostics().dump();
         EXPECT_TRUE(std::filesystem::is_directory(debugSource / ".git"));
         EXPECT_TRUE(std::filesystem::is_directory(cache.source(model.rootPackage.dependencies[0]) / ".git"));
     }
-}
+} // namespace rhodium::tests::gitFetcherTests

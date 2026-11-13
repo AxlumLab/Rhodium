@@ -17,6 +17,13 @@ namespace rhodium
         return std::filesystem::exists(preferred) || !std::filesystem::exists(legacy) ? preferred : legacy;
     }
 
+    std::filesystem::path Path::lockFile(const std::filesystem::path &workspaceRoot)
+    {
+        const auto preferred = workspaceRoot / "rhodium.lock.toml";
+        const auto legacy = workspaceRoot / "tpkg.lock.toml";
+        return std::filesystem::exists(preferred) || !std::filesystem::exists(legacy) ? preferred : legacy;
+    }
+
     std::filesystem::path Path::stateRoot(const std::filesystem::path &workspaceRoot)
     {
         const auto preferred = workspaceRoot / ".rhodium";

@@ -133,7 +133,7 @@ set_target_properties(rhodium::my-lib PROPERTIES
 
 ### Lock File
 
-The `export_defines` value is stored in `tpkg.lock.toml`:
+The `export_defines` value is stored in `rhodium.lock.toml`:
 
 ```toml
 [[package]]

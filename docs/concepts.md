@@ -12,7 +12,7 @@ Your application or library remains a CMake project.
 
 ## Lockfile
 
-`tpkg.lock.toml` records resolved source state, such as Git commits or archive hashes. Commit this file to make restore reproducible.
+`rhodium.lock.toml` records resolved source state, such as Git commits or archive hashes. Commit this file to make restore reproducible.
 
 ## Package source cache
 

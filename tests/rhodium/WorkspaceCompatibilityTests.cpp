@@ -13,7 +13,7 @@
 #include <fstream>
 #include <string>
 
-namespace
+namespace rhodium::tests::workspaceCompatibilityTests
 {
     class WorkspaceCompatibilityTests : public ::testing::Test
     {
@@ -44,11 +44,14 @@ namespace
     {
         EXPECT_EQ(rhodium::CliWorkspace::manifest(root), root / "rhodium.lua");
         EXPECT_EQ(rhodium::Path::stateRoot(root), root / ".rhodium");
+        EXPECT_EQ(rhodium::Path::lockFile(root), root / "rhodium.lock.toml");
     }
 
     TEST_F(WorkspaceCompatibilityTests, LegacyManifestAndStateRemainUsable)
     {
         writeManifest("tpkg.lua");
+        writeManifest("tpkg.lock.toml", "version = 1\n");
+        EXPECT_EQ(rhodium::Path::lockFile(root), root / "tpkg.lock.toml");
         std::filesystem::create_directories(root / ".tpkg");
         EXPECT_EQ(rhodium::CliWorkspace::manifest(root), root / "tpkg.lua");
         EXPECT_EQ(rhodium::Path::stateRoot(root), root / ".tpkg");
@@ -65,9 +68,12 @@ namespace
     {
         writeManifest("tpkg.lua", "package(\"legacy\")\n");
         writeManifest("rhodium.lua", "package(\"preferred\")\n");
+        writeManifest("tpkg.lock.toml", "version = 1\n");
+        writeManifest("rhodium.lock.toml", "version = 1\n");
         std::filesystem::create_directories(root / ".tpkg");
         std::filesystem::create_directories(root / ".rhodium");
         EXPECT_EQ(rhodium::Path::stateRoot(root), root / ".rhodium");
+        EXPECT_EQ(rhodium::Path::lockFile(root), root / "rhodium.lock.toml");
         EXPECT_EQ(rhodium::DependencyOverrides::path(root), root / ".rhodium" / "overrides.toml");
 
         rhodium::ManifestLoader loader;
@@ -99,13 +105,11 @@ namespace
     {
         std::filesystem::create_directories(root / ".tpkg");
         std::filesystem::create_directories(root / ".rhodium");
-        EXPECT_EQ(rhodium::Commands::clean(root, rhodium::CleanOptions{
-    .all = true,
-    .artifacts = false,
-    .sources = false,
-    .lock = false,
-    .packageName = ""
-}), 0);
+        EXPECT_EQ(rhodium::Commands::clean(
+                      root,
+                      rhodium::CleanOptions{
+                          .all = true, .artifacts = false, .sources = false, .lock = false, .packageName = ""}),
+                  0);
         EXPECT_FALSE(std::filesystem::exists(root / ".rhodium"));
         EXPECT_TRUE(std::filesystem::exists(root / ".tpkg"));
     }
@@ -130,4 +134,4 @@ namespace
         EXPECT_FALSE(std::filesystem::exists(state));
     }
 #endif
-}
+} // namespace rhodium::tests::workspaceCompatibilityTests

@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-namespace
+namespace rhodium::tests::fileSystemTests
 {
     class FileSystemTests : public ::testing::Test
     {
@@ -77,7 +77,8 @@ namespace
     TEST_F(FileSystemTests, PreservesPrivateFilePermissions)
     {
         ASSERT_TRUE(rhodium::File::write(root / "config", "old"));
-        std::filesystem::permissions(root / "config", std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+        std::filesystem::permissions(root / "config",
+                                     std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
         ASSERT_TRUE(rhodium::File::write(root / "config", "new"));
         EXPECT_EQ(std::filesystem::status(root / "config").permissions(),
                   std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
@@ -90,17 +91,18 @@ namespace
         ASSERT_TRUE(rhodium::File::write(root / "state", first));
         std::atomic<bool> finished{false};
         std::atomic<bool> torn{false};
-        std::thread reader([&]
-                           {
-                               while (!finished.load())
-                               {
-                                   const auto value = rhodium::File::read(root / "state");
-                                   if (value != first && value != second)
-                                   {
-                                       torn = true;
-                                   }
-                               }
-                           });
+        std::thread reader(
+            [&]
+            {
+                while (!finished.load())
+                {
+                    const auto value = rhodium::File::read(root / "state");
+                    if (value != first && value != second)
+                    {
+                        torn = true;
+                    }
+                }
+            });
         bool written = true;
         for (int index = 0; index < 16 && written; ++index)
         {
@@ -112,4 +114,4 @@ namespace
         EXPECT_FALSE(torn.load());
     }
 #endif
-}
+} // namespace rhodium::tests::fileSystemTests

@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 #include "rhodium/cmake/CMakeDependencyExporter.hpp"
 #include "rhodium/core/FileSystem.hpp"
@@ -13,7 +13,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace
+namespace rhodium::tests::cMakeDependencyExporterTests
 {
     std::filesystem::path makeTempDir()
     {
@@ -93,4 +93,4 @@ namespace
 
         std::filesystem::remove_all(root);
     }
-}
+} // namespace rhodium::tests::cMakeDependencyExporterTests

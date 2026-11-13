@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
- * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * @LastEditors: khfahqp khfahqp@gmail.com
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
 #include "rhodium/cli/CommandLine.hpp"
@@ -59,8 +59,8 @@ namespace rhodium
             ->callback(
                 [&]
                 {
-                context.exitCode = Commands::dumpModel(root(context.rootOption));
-            });
+                    context.exitCode = Commands::dumpModel(root(context.rootOption));
+                });
 #else
         (void)app;
         (void)context;
@@ -185,7 +185,7 @@ namespace rhodium
         clean->add_flag("--all", context.cleanAll, "Remove the active .rhodium or legacy .tpkg directory");
         clean->add_flag("--artifacts", context.cleanArtifacts, "Also remove artifacts from the active state directory");
         clean->add_flag("--sources", context.cleanSources, "Also remove the active source cache");
-        clean->add_flag("--lock", context.cleanLock, "Also remove tpkg.lock.toml");
+        clean->add_flag("--lock", context.cleanLock, "Also remove the active lockfile (rhodium.lock.toml or legacy tpkg.lock.toml)");
         clean->callback(
             [&]
             {

@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-namespace
+namespace rhodium::tests::dependencyResolverTests
 {
 
     std::filesystem::path makeTempDir()
@@ -139,9 +139,10 @@ namespace
         rhodium::DependencyResolver resolver;
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
 
-        EXPECT_TRUE(rhodium::File::exists(dir / "tpkg.lock.toml"));
+        EXPECT_TRUE(rhodium::File::exists(dir / "rhodium.lock.toml"));
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 2u);
         for (const auto &locked : lockFile.packages)
         {
@@ -149,8 +150,8 @@ namespace
             EXPECT_EQ(locked.artifactId, locked.name + "/" + locked.commit + "-" + locked.buildHash);
             EXPECT_TRUE(rhodium::File::exists(dir / ".rhodium/artifacts" / locked.artifactId / "artifact.toml"));
         }
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml").find("E:"), std::string::npos);
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml").find("cache_path"), std::string::npos);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml").find("E:"), std::string::npos);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml").find("cache_path"), std::string::npos);
 
         std::filesystem::remove_all(dir);
     }
@@ -191,11 +192,17 @@ int value() {
 
         std::string processOutput;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "init"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "master"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "tiny@example.invalid"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Tiny Test"}, processOutput)) << processOutput;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "master"}, processOutput))
+            << processOutput;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "tiny@example.invalid"},
+                                       processOutput))
+            << processOutput;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Tiny Test"}, processOutput))
+            << processOutput;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "add", "."}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "init tiny cmake lib"}, processOutput)) << processOutput;
+        ASSERT_TRUE(
+            runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "init tiny cmake lib"}, processOutput))
+            << processOutput;
 
         rhodium::BuildModel model;
         rhodium::DependencyDesc dependency;
@@ -215,7 +222,8 @@ int value() {
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 1u);
         const auto &locked = lockFile.packages[0];
         EXPECT_EQ(locked.name, "TinyCMakeLib");
@@ -235,13 +243,13 @@ int value() {
         EXPECT_TRUE(directoryHasFiles(artifactPath / "lib"));
         EXPECT_TRUE(rhodium::File::exists(artifactPath / "artifact.toml"));
 
-        const auto lockText = rhodium::File::read(dir / "tpkg.lock.toml");
+        const auto lockText = rhodium::File::read(dir / "rhodium.lock.toml");
         EXPECT_EQ(lockText.find("cache_path"), std::string::npos);
         EXPECT_EQ(lockText.find(dir.generic_string()), std::string::npos);
 
         rhodium::JsonDiagnosticSink secondDiagnostics;
         ASSERT_TRUE(resolver.restore(model, dir, secondDiagnostics)) << secondDiagnostics.diagnostics().dump();
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), lockText);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml"), lockText);
         const auto secondLog = secondDiagnostics.diagnostics().dump();
         EXPECT_NE(secondLog.find("skipping git sync and build"), std::string::npos);
         EXPECT_EQ(secondLog.find("fetching package"), std::string::npos);
@@ -258,11 +266,18 @@ int value() {
 
         std::string processOutput;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "init"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "master"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "broken@example.invalid"}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Broken Test"}, processOutput)) << processOutput;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "master"}, processOutput))
+            << processOutput;
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "broken@example.invalid"},
+                                       processOutput))
+            << processOutput;
+        ASSERT_TRUE(
+            runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Broken Test"}, processOutput))
+            << processOutput;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "add", "."}, processOutput)) << processOutput;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "init broken prebuilt"}, processOutput)) << processOutput;
+        ASSERT_TRUE(
+            runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "init broken prebuilt"}, processOutput))
+            << processOutput;
 
         rhodium::BuildModel model;
         rhodium::DependencyDesc dependency;
@@ -335,7 +350,8 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 1u);
         const auto &locked = lockFile.packages[0];
         EXPECT_EQ(locked.sourceType, "archive");
@@ -343,7 +359,8 @@ int value() {
         EXPECT_EQ(locked.resolvedArchiveHash, dependency.sha256);
         EXPECT_EQ(locked.stripComponents, 1);
         EXPECT_FALSE(locked.buildHash.empty());
-        EXPECT_TRUE(rhodium::File::exists(dir / ".rhodium" / "artifacts" / locked.artifactId / "include" / "hello" / "hello.hpp"));
+        EXPECT_TRUE(rhodium::File::exists(dir / ".rhodium" / "artifacts" / locked.artifactId / "include" / "hello" /
+                                          "hello.hpp"));
 
         std::filesystem::remove_all(dir);
     }
@@ -366,7 +383,8 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 2u);
         EXPECT_NE(lockFile.packages[0].config, lockFile.packages[1].config);
         EXPECT_NE(lockFile.packages[0].artifactId, lockFile.packages[1].artifactId);
@@ -392,7 +410,8 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 2u);
         EXPECT_NE(lockFile.packages[0].toolchainId, lockFile.packages[1].toolchainId);
         EXPECT_NE(lockFile.packages[0].artifactId, lockFile.packages[1].artifactId);
@@ -423,7 +442,8 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile lockFile;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", lockFile, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", lockFile, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(lockFile.packages.size(), 2u);
         EXPECT_NE(lockFile.packages[0].overridden, lockFile.packages[1].overridden);
         EXPECT_NE(lockFile.packages[0].artifactId, lockFile.packages[1].artifactId);
@@ -445,7 +465,8 @@ int value() {
             model, dir, diagnostics,
             rhodium::DependencyRestoreRequest{
                 .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = options}));
-        EXPECT_NE(diagnostics.diagnostics().dump().find("restore --locked requires an existing lock entry"), std::string::npos);
+        EXPECT_NE(diagnostics.diagnostics().dump().find("restore --locked requires an existing lock entry"),
+                  std::string::npos);
 
         std::filesystem::remove_all(dir);
     }
@@ -465,7 +486,7 @@ int value() {
             rhodium::DependencyRestoreRequest{
                 .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = options}))
             << diagnostics.diagnostics().dump();
-        const auto before = rhodium::File::read(dir / "tpkg.lock.toml");
+        const auto before = rhodium::File::read(dir / "rhodium.lock.toml");
 
         rhodium::DependencyRestoreOptions locked;
         locked.locked = true;
@@ -475,7 +496,7 @@ int value() {
             rhodium::DependencyRestoreRequest{
                 .preferredToolchain = "windows-msvc-x64", .config = "debug", .overrides = {}, .options = locked}))
             << diagnostics.diagnostics().dump();
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml"), before);
 
         std::filesystem::remove_all(dir);
     }
@@ -502,7 +523,8 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile before;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", before, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", before, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(before.packages.size(), 2u);
 
         rhodium::DependencyRestoreOptions updateOptions;
@@ -516,9 +538,11 @@ int value() {
             << diagnostics.diagnostics().dump();
 
         rhodium::LockFile after;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", after, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", after, diagnostics))
+            << diagnostics.diagnostics().dump();
         ASSERT_EQ(after.packages.size(), 2u);
-        const auto findHash = [](const rhodium::LockFile &lock, const std::string &name) {
+        const auto findHash = [](const rhodium::LockFile &lock, const std::string &name)
+        {
             for (const auto &package : lock.packages)
             {
                 if (package.name == name)
@@ -543,24 +567,27 @@ int value() {
         rhodium::JsonDiagnosticSink diagnostics;
         rhodium::DependencyRestoreOptions options;
         options.toolchainContentHash = "toolchain-a";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
-        const auto before = rhodium::File::read(dir / "tpkg.lock.toml");
+        ASSERT_TRUE(resolver.restore(model, dir, diagnostics,
+                                     rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
+        const auto before = rhodium::File::read(dir / "rhodium.lock.toml");
         const auto artifactCount = directoryCount(dir / ".rhodium/artifacts/HeaderOnly");
 
         options.locked = true;
         model.rootPackage.dependencies[0].buildOptions["FEATURE"] = "ON";
         rhodium::JsonDiagnosticSink changedInputs;
-        EXPECT_FALSE(resolver.restore(model, dir, changedInputs, rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
+        EXPECT_FALSE(resolver.restore(model, dir, changedInputs,
+                                      rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
         EXPECT_NE(changedInputs.diagnostics().dump().find("inputs differ from the lock entry"), std::string::npos);
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml"), before);
         EXPECT_EQ(directoryCount(dir / ".rhodium/artifacts/HeaderOnly"), artifactCount);
 
         model.rootPackage.dependencies[0].buildOptions.clear();
         options.toolchainContentHash = "toolchain-b";
         rhodium::JsonDiagnosticSink changedToolchain;
-        EXPECT_FALSE(resolver.restore(model, dir, changedToolchain, rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
+        EXPECT_FALSE(resolver.restore(model, dir, changedToolchain,
+                                      rhodium::DependencyRestoreRequest{"fixture", "debug", {}, options}));
         EXPECT_NE(changedToolchain.diagnostics().dump().find("inputs differ from the lock entry"), std::string::npos);
-        EXPECT_EQ(rhodium::File::read(dir / "tpkg.lock.toml"), before);
+        EXPECT_EQ(rhodium::File::read(dir / "rhodium.lock.toml"), before);
         EXPECT_EQ(directoryCount(dir / ".rhodium/artifacts/HeaderOnly"), artifactCount);
         std::filesystem::remove_all(dir);
     }
@@ -592,7 +619,8 @@ int value() {
             options.buildOnly = mode == 1;
             options.exportOnly = mode == 2;
             rhodium::JsonDiagnosticSink explicitStage;
-            ASSERT_TRUE(resolver.restore(model, dir, explicitStage, rhodium::DependencyRestoreRequest{{}, "debug", {}, options}))
+            ASSERT_TRUE(resolver.restore(model, dir, explicitStage,
+                                         rhodium::DependencyRestoreRequest{{}, "debug", {}, options}))
                 << explicitStage.diagnostics().dump();
             EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping archive build"), std::string::npos);
             EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping build"), std::string::npos);
@@ -612,8 +640,10 @@ int value() {
         writeText(repo / "include/value.hpp", "first\n");
         std::string output;
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "init"}, output)) << output;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "feature/topic"}, output)) << output;
-        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "test@example.invalid"}, output));
+        ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "checkout", "-B", "feature/topic"}, output))
+            << output;
+        ASSERT_TRUE(
+            runRequiredProcess("git", {"-C", repo.string(), "config", "user.email", "test@example.invalid"}, output));
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "config", "user.name", "Fixture"}, output));
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "add", "."}, output));
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "first"}, output)) << output;
@@ -631,7 +661,7 @@ int value() {
         rhodium::JsonDiagnosticSink diagnostics;
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
         rhodium::LockFile first;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", first, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", first, diagnostics));
         ASSERT_EQ(first.packages.size(), 1u);
         rhodium::PackageCache cache(dir / ".rhodium/packages");
         ASSERT_TRUE(std::filesystem::is_directory(cache.source(dependency) / ".git"));
@@ -651,7 +681,9 @@ int value() {
             options.buildOnly = mode == 1;
             options.exportOnly = mode == 2;
             rhodium::JsonDiagnosticSink explicitStage;
-            ASSERT_TRUE(resolver.restore(model, dir, explicitStage, rhodium::DependencyRestoreRequest{{}, "debug", {}, options})) << explicitStage.diagnostics().dump();
+            ASSERT_TRUE(resolver.restore(model, dir, explicitStage,
+                                         rhodium::DependencyRestoreRequest{{}, "debug", {}, options}))
+                << explicitStage.diagnostics().dump();
             EXPECT_EQ(explicitStage.diagnostics().dump().find("skipping git sync and build"), std::string::npos);
             if (options.rebuild)
             {
@@ -664,27 +696,34 @@ int value() {
         ASSERT_TRUE(runRequiredProcess("git", {"-C", repo.string(), "commit", "-m", "second"}, output)) << output;
         rhodium::DependencyRestoreOptions update;
         update.updatePackage = dependency.name;
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, update})) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(
+            resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, update}))
+            << diagnostics.diagnostics().dump();
         rhodium::LockFile updated;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", updated, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", updated, diagnostics));
         ASSERT_EQ(updated.packages.size(), 1u);
         EXPECT_NE(updated.packages[0].commit, first.packages[0].commit);
-        EXPECT_EQ(rhodium::File::read(dir / ".rhodium/artifacts" / updated.packages[0].artifactId / "include/value.hpp"), "second\n");
+        EXPECT_EQ(
+            rhodium::File::read(dir / ".rhodium/artifacts" / updated.packages[0].artifactId / "include/value.hpp"),
+            "second\n");
         EXPECT_TRUE(std::filesystem::is_directory(cache.source(dependency) / ".git"));
 
-        ASSERT_TRUE(resolver.restore(defaultModel, defaultWorkspace, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, update}))
+        ASSERT_TRUE(resolver.restore(defaultModel, defaultWorkspace, diagnostics,
+                                     rhodium::DependencyRestoreRequest{{}, "debug", {}, update}))
             << diagnostics.diagnostics().dump();
         rhodium::LockFile updatedDefault;
-        ASSERT_TRUE(rhodium::LockFile::read(defaultWorkspace / "tpkg.lock.toml", updatedDefault, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(defaultWorkspace / "rhodium.lock.toml", updatedDefault, diagnostics));
         ASSERT_EQ(updatedDefault.packages.size(), 1u);
         EXPECT_EQ(updatedDefault.packages[0].commit, updated.packages[0].commit);
 
         model.rootPackage.dependencies[0].ref = first.packages[0].commit;
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
         rhodium::LockFile pinned;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", pinned, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", pinned, diagnostics));
         EXPECT_EQ(pinned.packages.back().commit, first.packages[0].commit);
-        EXPECT_EQ(rhodium::File::read(dir / ".rhodium/artifacts" / pinned.packages.back().artifactId / "include/value.hpp"), "first\n");
+        EXPECT_EQ(
+            rhodium::File::read(dir / ".rhodium/artifacts" / pinned.packages.back().artifactId / "include/value.hpp"),
+            "first\n");
         std::filesystem::remove_all(dir);
     }
 
@@ -697,11 +736,13 @@ int value() {
         rhodium::DependencyRestoreOptions options;
         options.locked = true;
         options.updateAll = true;
-        EXPECT_FALSE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, options}));
+        EXPECT_FALSE(
+            resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, options}));
         options = {};
         options.exportOnly = true;
         options.rebuild = true;
-        EXPECT_FALSE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, options}));
+        EXPECT_FALSE(
+            resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, options}));
         EXPECT_FALSE(std::filesystem::exists(dir / ".rhodium"));
         std::filesystem::remove_all(dir);
     }
@@ -720,22 +761,23 @@ int value() {
         rhodium::DependencyResolver resolver;
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
         rhodium::LockFile before;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", before, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", before, diagnostics));
         ASSERT_EQ(before.packages.size(), 2u);
         const auto oldArtifact = dir / ".rhodium/artifacts" / before.packages[1].artifactId;
 
         model.rootPackage.dependencies.pop_back();
         rhodium::DependencyRestoreOptions targeted;
         targeted.packageName = "A";
-        ASSERT_TRUE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, targeted}));
+        ASSERT_TRUE(
+            resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug", {}, targeted}));
         rhodium::LockFile partial;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", partial, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", partial, diagnostics));
         EXPECT_EQ(partial.packages.size(), 2u);
         EXPECT_TRUE(std::filesystem::exists(oldArtifact));
 
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics)) << diagnostics.diagnostics().dump();
         rhodium::LockFile after;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", after, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", after, diagnostics));
         ASSERT_EQ(after.packages.size(), 1u);
         EXPECT_EQ(after.packages[0].name, "A");
         EXPECT_FALSE(std::filesystem::exists(oldArtifact));
@@ -755,15 +797,15 @@ int value() {
         model.rootPackage.dependencies.clear();
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "debug"}));
         rhodium::LockFile remaining;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", remaining, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", remaining, diagnostics));
         ASSERT_EQ(remaining.packages.size(), 1u);
         EXPECT_EQ(remaining.packages[0].config, "release");
         ASSERT_TRUE(resolver.restore(model, dir, diagnostics, rhodium::DependencyRestoreRequest{{}, "release"}));
         rhodium::LockFile empty;
-        ASSERT_TRUE(rhodium::LockFile::read(dir / "tpkg.lock.toml", empty, diagnostics));
+        ASSERT_TRUE(rhodium::LockFile::read(dir / "rhodium.lock.toml", empty, diagnostics));
         EXPECT_TRUE(empty.packages.empty());
         EXPECT_TRUE(std::filesystem::is_directory(dir / "third_party/HeaderOnly/include"));
         std::filesystem::remove_all(dir);
     }
 
-} // namespace
+} // namespace rhodium::tests::dependencyResolverTests

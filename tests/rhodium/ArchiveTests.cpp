@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace
+namespace rhodium::tests::archiveTests
 {
     std::filesystem::path tempDir(const std::string &name)
     {
@@ -76,152 +76,158 @@ namespace
         archive_write_close(tar);
         archive_write_free(tar);
     }
-}
 
-TEST(ArchiveTests, Sha256FileComputesExpectedHash)
-{
-    const auto dir = tempDir("sha256");
-    writeFile(dir / "hello.txt", "hello\n");
-    EXPECT_EQ(rhodium::Sha256::file(dir / "hello.txt"), "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03");
-    EXPECT_TRUE(rhodium::Sha256::equal("ABCDEF", "abcdef"));
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, ExtractZipWithStripComponents)
-{
-    const auto dir = tempDir("archive-strip");
-    const auto zip = dir / "hello.zip";
-    createZip(zip, {{"hello-1.0/include/hello.hpp", "#pragma once\n"}});
-
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    ASSERT_TRUE(extractor.extract(zip, dir / "out", 1, diagnostics)) << diagnostics.diagnostics().dump();
-    EXPECT_TRUE(rhodium::File::exists(dir / "out" / "include" / "hello.hpp"));
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, RejectsPathTraversalEntry)
-{
-    const auto dir = tempDir("archive-unsafe");
-    const auto zip = dir / "bad.zip";
-    createZip(zip, {{"../escape.txt", "bad"}});
-
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    EXPECT_FALSE(extractor.extract(zip, dir / "out", 0, diagnostics));
-    EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive entry"), std::string::npos);
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, RejectsSymlinkTargetsOutsideTheExtractionRoot)
-{
-    const auto dir = tempDir("archive-symlink");
-    writeFile(dir / "outside.txt", "keep");
-    createTarWithLink(dir / "unsafe.tar", "../outside.txt", false);
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    EXPECT_FALSE(extractor.extract(dir / "unsafe.tar", dir / "out", 1, diagnostics));
-    EXPECT_EQ(rhodium::File::read(dir / "outside.txt"), "keep");
-    EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive symlink"), std::string::npos);
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, RejectsHardlinkTargetsOutsideTheExtractionRoot)
-{
-    const auto dir = tempDir("archive-hardlink");
-    writeFile(dir / "outside.txt", "keep");
-    createTarWithLink(dir / "unsafe.tar", "../outside.txt", true);
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    EXPECT_FALSE(extractor.extract(dir / "unsafe.tar", dir / "out", 1, diagnostics));
-    EXPECT_EQ(rhodium::File::read(dir / "outside.txt"), "keep");
-    EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive hardlink"), std::string::npos);
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, StripsHardlinkTargetsTogetherWithEntryPaths)
-{
-    const auto dir = tempDir("archive-safe-hardlink");
-    createTarWithLink(dir / "safe.tar", "pkg/target.txt", true);
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    ASSERT_TRUE(extractor.extract(dir / "safe.tar", dir / "out", 1, diagnostics)) << diagnostics.diagnostics().dump();
-    EXPECT_EQ(rhodium::File::read(dir / "out/link.txt"), "payload");
-    std::filesystem::remove_all(dir);
-}
-
-TEST(ArchiveTests, AllowsSafeRelativeSymlinksWhenSupported)
-{
-    const auto dir = tempDir("archive-safe-symlink");
-    std::error_code ec;
-    std::filesystem::create_symlink("target.txt", dir / "probe", ec);
-    if (ec)
+    TEST(ArchiveTests, Sha256FileComputesExpectedHash)
     {
+        const auto dir = tempDir("sha256");
+        writeFile(dir / "hello.txt", "hello\n");
+        EXPECT_EQ(rhodium::Sha256::file(dir / "hello.txt"),
+                  "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03");
+        EXPECT_TRUE(rhodium::Sha256::equal("ABCDEF", "abcdef"));
         std::filesystem::remove_all(dir);
-        GTEST_SKIP() << "symlinks are unavailable: " << ec.message();
     }
-    std::filesystem::remove(dir / "probe");
-    createTarWithLink(dir / "safe.tar", "target.txt", false);
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    ASSERT_TRUE(extractor.extract(dir / "safe.tar", dir / "out", 1, diagnostics)) << diagnostics.diagnostics().dump();
-    EXPECT_EQ(rhodium::File::read(dir / "out/link.txt"), "payload");
-    std::filesystem::remove_all(dir);
-}
 
-TEST(ArchiveTests, RejectsWritesThroughExistingDirectorySymlinks)
-{
-    const auto dir = tempDir("archive-existing-symlink");
-    std::filesystem::create_directories(dir / "outside");
-    std::filesystem::create_directories(dir / "out");
-    std::error_code ec;
-    std::filesystem::create_directory_symlink(dir / "outside", dir / "out/link", ec);
-    if (ec)
+    TEST(ArchiveTests, ExtractZipWithStripComponents)
     {
+        const auto dir = tempDir("archive-strip");
+        const auto zip = dir / "hello.zip";
+        createZip(zip, {{"hello-1.0/include/hello.hpp", "#pragma once\n"}});
+
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(extractor.extract(zip, dir / "out", 1, diagnostics)) << diagnostics.diagnostics().dump();
+        EXPECT_TRUE(rhodium::File::exists(dir / "out" / "include" / "hello.hpp"));
         std::filesystem::remove_all(dir);
-        GTEST_SKIP() << "directory symlinks are unavailable: " << ec.message();
     }
-    createZip(dir / "unsafe.zip", {{"link/escape.txt", "bad"}});
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    EXPECT_FALSE(extractor.extract(dir / "unsafe.zip", dir / "out", 0, diagnostics));
-    EXPECT_FALSE(std::filesystem::exists(dir / "outside/escape.txt"));
-    std::filesystem::remove_all(dir);
-}
 
-TEST(ArchiveTests, DoesNotTreatTruncatedArchiveHeadersAsSuccessfulExtraction)
-{
-    const auto dir = tempDir("archive-truncated-header");
-    createTarWithLink(dir / "truncated.tar", "pkg/target.txt", true);
-    // One regular header and padded data block, followed by an incomplete header.
-    std::filesystem::resize_file(dir / "truncated.tar", 1024 + 128);
-    rhodium::ArchiveExtractor extractor;
-    rhodium::JsonDiagnosticSink diagnostics;
-    EXPECT_FALSE(extractor.extract(dir / "truncated.tar", dir / "out", 1, diagnostics));
-    std::filesystem::remove_all(dir);
-}
+    TEST(ArchiveTests, RejectsPathTraversalEntry)
+    {
+        const auto dir = tempDir("archive-unsafe");
+        const auto zip = dir / "bad.zip";
+        createZip(zip, {{"../escape.txt", "bad"}});
 
-TEST(ArchiveTests, FetcherReusesExtractedArchiveWhenMarkerMatches)
-{
-    const auto dir = tempDir("archive-fetch");
-    const auto zip = dir / "hello.zip";
-    createZip(zip, {{"hello-1.0/include/hello.hpp", "#pragma once\n"}});
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        EXPECT_FALSE(extractor.extract(zip, dir / "out", 0, diagnostics));
+        EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive entry"), std::string::npos);
+        std::filesystem::remove_all(dir);
+    }
 
-    rhodium::DependencyDesc dep;
-    dep.name = "hello";
-    dep.source = zip.string();
-    dep.sourceType = "archive";
-    dep.sha256 = rhodium::Sha256::file(zip);
-    dep.stripComponents = 1;
+    TEST(ArchiveTests, RejectsSymlinkTargetsOutsideTheExtractionRoot)
+    {
+        const auto dir = tempDir("archive-symlink");
+        writeFile(dir / "outside.txt", "keep");
+        createTarWithLink(dir / "unsafe.tar", "../outside.txt", false);
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        EXPECT_FALSE(extractor.extract(dir / "unsafe.tar", dir / "out", 1, diagnostics));
+        EXPECT_EQ(rhodium::File::read(dir / "outside.txt"), "keep");
+        EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive symlink"), std::string::npos);
+        std::filesystem::remove_all(dir);
+    }
 
-    rhodium::ArchiveFetcher fetcher;
-    rhodium::ArchiveFetchResult first;
-    rhodium::JsonDiagnosticSink diagnostics;
-    ASSERT_TRUE(fetcher.fetchAndExtract(dep, dir, dir / ".tpkg" / "packages", first, diagnostics)) << diagnostics.diagnostics().dump();
-    const auto marker = rhodium::File::read(first.sourceDir / ".tpkg_archive_marker");
+    TEST(ArchiveTests, RejectsHardlinkTargetsOutsideTheExtractionRoot)
+    {
+        const auto dir = tempDir("archive-hardlink");
+        writeFile(dir / "outside.txt", "keep");
+        createTarWithLink(dir / "unsafe.tar", "../outside.txt", true);
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        EXPECT_FALSE(extractor.extract(dir / "unsafe.tar", dir / "out", 1, diagnostics));
+        EXPECT_EQ(rhodium::File::read(dir / "outside.txt"), "keep");
+        EXPECT_NE(diagnostics.diagnostics().dump().find("unsafe archive hardlink"), std::string::npos);
+        std::filesystem::remove_all(dir);
+    }
 
-    rhodium::ArchiveFetchResult second;
-    ASSERT_TRUE(fetcher.fetchAndExtract(dep, dir, dir / ".tpkg" / "packages", second, diagnostics)) << diagnostics.diagnostics().dump();
-    EXPECT_EQ(rhodium::File::read(second.sourceDir / ".tpkg_archive_marker"), marker);
-    std::filesystem::remove_all(dir);
-}
+    TEST(ArchiveTests, StripsHardlinkTargetsTogetherWithEntryPaths)
+    {
+        const auto dir = tempDir("archive-safe-hardlink");
+        createTarWithLink(dir / "safe.tar", "pkg/target.txt", true);
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(extractor.extract(dir / "safe.tar", dir / "out", 1, diagnostics))
+            << diagnostics.diagnostics().dump();
+        EXPECT_EQ(rhodium::File::read(dir / "out/link.txt"), "payload");
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(ArchiveTests, AllowsSafeRelativeSymlinksWhenSupported)
+    {
+        const auto dir = tempDir("archive-safe-symlink");
+        std::error_code ec;
+        std::filesystem::create_symlink("target.txt", dir / "probe", ec);
+        if (ec)
+        {
+            std::filesystem::remove_all(dir);
+            GTEST_SKIP() << "symlinks are unavailable: " << ec.message();
+        }
+        std::filesystem::remove(dir / "probe");
+        createTarWithLink(dir / "safe.tar", "target.txt", false);
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(extractor.extract(dir / "safe.tar", dir / "out", 1, diagnostics))
+            << diagnostics.diagnostics().dump();
+        EXPECT_EQ(rhodium::File::read(dir / "out/link.txt"), "payload");
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(ArchiveTests, RejectsWritesThroughExistingDirectorySymlinks)
+    {
+        const auto dir = tempDir("archive-existing-symlink");
+        std::filesystem::create_directories(dir / "outside");
+        std::filesystem::create_directories(dir / "out");
+        std::error_code ec;
+        std::filesystem::create_directory_symlink(dir / "outside", dir / "out/link", ec);
+        if (ec)
+        {
+            std::filesystem::remove_all(dir);
+            GTEST_SKIP() << "directory symlinks are unavailable: " << ec.message();
+        }
+        createZip(dir / "unsafe.zip", {{"link/escape.txt", "bad"}});
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        EXPECT_FALSE(extractor.extract(dir / "unsafe.zip", dir / "out", 0, diagnostics));
+        EXPECT_FALSE(std::filesystem::exists(dir / "outside/escape.txt"));
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(ArchiveTests, DoesNotTreatTruncatedArchiveHeadersAsSuccessfulExtraction)
+    {
+        const auto dir = tempDir("archive-truncated-header");
+        createTarWithLink(dir / "truncated.tar", "pkg/target.txt", true);
+        // One regular header and padded data block, followed by an incomplete header.
+        std::filesystem::resize_file(dir / "truncated.tar", 1024 + 128);
+        rhodium::ArchiveExtractor extractor;
+        rhodium::JsonDiagnosticSink diagnostics;
+        EXPECT_FALSE(extractor.extract(dir / "truncated.tar", dir / "out", 1, diagnostics));
+        std::filesystem::remove_all(dir);
+    }
+
+    TEST(ArchiveTests, FetcherReusesExtractedArchiveWhenMarkerMatches)
+    {
+        const auto dir = tempDir("archive-fetch");
+        const auto zip = dir / "hello.zip";
+        createZip(zip, {{"hello-1.0/include/hello.hpp", "#pragma once\n"}});
+
+        rhodium::DependencyDesc dep;
+        dep.name = "hello";
+        dep.source = zip.string();
+        dep.sourceType = "archive";
+        dep.sha256 = rhodium::Sha256::file(zip);
+        dep.stripComponents = 1;
+
+        rhodium::ArchiveFetcher fetcher;
+        rhodium::ArchiveFetchResult first;
+        rhodium::JsonDiagnosticSink diagnostics;
+        ASSERT_TRUE(fetcher.fetchAndExtract(dep, dir, dir / ".tpkg" / "packages", first, diagnostics))
+            << diagnostics.diagnostics().dump();
+        const auto marker = rhodium::File::read(first.sourceDir / ".tpkg_archive_marker");
+
+        rhodium::ArchiveFetchResult second;
+        ASSERT_TRUE(fetcher.fetchAndExtract(dep, dir, dir / ".tpkg" / "packages", second, diagnostics))
+            << diagnostics.diagnostics().dump();
+        EXPECT_EQ(rhodium::File::read(second.sourceDir / ".tpkg_archive_marker"), marker);
+        std::filesystem::remove_all(dir);
+    }
+
+} // namespace rhodium::tests::archiveTests

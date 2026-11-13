@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
 #include "rhodium/core/Path.hpp"
@@ -24,414 +24,398 @@
 
 namespace rhodium
 {
-    namespace
+
+    class ProfileFields final
     {
-        class ProfileFields final
+    public:
+        static ToolchainProfile read(const toml::table &table)
         {
-        public:
-            static ToolchainProfile read(const toml::table &table)
+            ToolchainProfile profile;
+            profile.id = ProfileFields::string(table, "id");
+            profile.platform = ProfileFields::string(table, "platform");
+            profile.hostArch = ProfileFields::string(table, "host_arch");
+            profile.targetArch = ProfileFields::string(table, "target_arch");
+            profile.compilerKind = ProfileFields::string(table, "compiler_kind");
+            profile.sdkKind = ProfileFields::string(table, "sdk_kind");
+            profile.compiler = ProfileFields::path(table, "compiler");
+            profile.cxxCompiler = ProfileFields::path(table, "cxx_compiler");
+            profile.linker = ProfileFields::path(table, "linker");
+            profile.archiver = ProfileFields::path(table, "archiver");
+            profile.resourceCompiler = ProfileFields::path(table, "resource_compiler");
+            profile.manifestTool = ProfileFields::path(table, "manifest_tool");
+            profile.cmake = ProfileFields::path(table, "cmake");
+            profile.ninja = ProfileFields::path(table, "ninja");
+            profile.git = ProfileFields::path(table, "git");
+            profile.strip = ProfileFields::path(table, "strip");
+            profile.ranlib = ProfileFields::path(table, "ranlib");
+            profile.libtool = ProfileFields::path(table, "libtool");
+            profile.lipo = ProfileFields::path(table, "lipo");
+            profile.codesign = ProfileFields::path(table, "codesign");
+            profile.adb = ProfileFields::path(table, "adb");
+            profile.java = ProfileFields::path(table, "java");
+            profile.javac = ProfileFields::path(table, "javac");
+            profile.gradle = ProfileFields::path(table, "gradle");
+            profile.compilerVersion = ProfileFields::string(table, "compiler_version");
+            profile.sdkRoot = ProfileFields::path(table, "sdk_root");
+            profile.sysroot = ProfileFields::path(table, "sysroot");
+            if (profile.sysroot.empty())
             {
-                ToolchainProfile profile;
-                profile.id = ProfileFields::string(table, "id");
-                profile.platform = ProfileFields::string(table, "platform");
-                profile.hostArch = ProfileFields::string(table, "host_arch");
-                profile.targetArch = ProfileFields::string(table, "target_arch");
-                profile.compilerKind = ProfileFields::string(table, "compiler_kind");
-                profile.sdkKind = ProfileFields::string(table, "sdk_kind");
-                profile.compiler = ProfileFields::path(table, "compiler");
-                profile.cxxCompiler = ProfileFields::path(table, "cxx_compiler");
-                profile.linker = ProfileFields::path(table, "linker");
-                profile.archiver = ProfileFields::path(table, "archiver");
-                profile.resourceCompiler = ProfileFields::path(table, "resource_compiler");
-                profile.manifestTool = ProfileFields::path(table, "manifest_tool");
-                profile.cmake = ProfileFields::path(table, "cmake");
-                profile.ninja = ProfileFields::path(table, "ninja");
-                profile.git = ProfileFields::path(table, "git");
-                profile.strip = ProfileFields::path(table, "strip");
-                profile.ranlib = ProfileFields::path(table, "ranlib");
-                profile.libtool = ProfileFields::path(table, "libtool");
-                profile.lipo = ProfileFields::path(table, "lipo");
-                profile.codesign = ProfileFields::path(table, "codesign");
-                profile.adb = ProfileFields::path(table, "adb");
-                profile.java = ProfileFields::path(table, "java");
-                profile.javac = ProfileFields::path(table, "javac");
-                profile.gradle = ProfileFields::path(table, "gradle");
-                profile.compilerVersion = ProfileFields::string(table, "compiler_version");
-                profile.sdkRoot = ProfileFields::path(table, "sdk_root");
-                profile.sysroot = ProfileFields::path(table, "sysroot");
-                if (profile.sysroot.empty())
-                {
-                    profile.sysroot = profile.sdkRoot;
-                }
-                profile.sdkVersion = ProfileFields::string(table, "sdk_version");
-                profile.androidSdkRoot = ProfileFields::path(table, "android_sdk_root");
-                profile.androidNdkRoot = ProfileFields::path(table, "android_ndk_root");
-                profile.jdkRoot = ProfileFields::path(table, "jdk_root");
-                profile.androidApi = ProfileFields::string(table, "android_api");
-                profile.androidAbi = ProfileFields::string(table, "android_abi");
-                profile.targetTriple = ProfileFields::string(table, "target_triple");
-                profile.deploymentTarget = ProfileFields::string(table, "deployment_target");
-                profile.complete = (table)["complete"].value_or(false);
-                profile.missing = ProfileFields::strings(table, "missing");
-                profile.systemIncludeDirs = ProfileFields::paths(table, "system_include_dirs");
-                profile.systemLibDirs = ProfileFields::paths(table, "system_lib_dirs");
-                profile.binaryDirs = ProfileFields::paths(table, "binary_dirs");
-                if (const auto *env = (table)["environment"].as_table())
-                {
-                    for (const auto &[key, value] : *env)
-                    {
-                        if (auto text = value.value<std::string>())
-                        {
-                            profile.environment[std::string(key.str())] = *text;
-                        }
-                    }
-                }
-                return profile;
+                profile.sysroot = profile.sdkRoot;
             }
-
-            static void writePaths(std::ostringstream &stream, const char *key,
-                                   const std::vector<std::filesystem::path> &values)
+            profile.sdkVersion = ProfileFields::string(table, "sdk_version");
+            profile.androidSdkRoot = ProfileFields::path(table, "android_sdk_root");
+            profile.androidNdkRoot = ProfileFields::path(table, "android_ndk_root");
+            profile.jdkRoot = ProfileFields::path(table, "jdk_root");
+            profile.androidApi = ProfileFields::string(table, "android_api");
+            profile.androidAbi = ProfileFields::string(table, "android_abi");
+            profile.targetTriple = ProfileFields::string(table, "target_triple");
+            profile.deploymentTarget = ProfileFields::string(table, "deployment_target");
+            profile.complete = (table)["complete"].value_or(false);
+            profile.missing = ProfileFields::strings(table, "missing");
+            profile.systemIncludeDirs = ProfileFields::paths(table, "system_include_dirs");
+            profile.systemLibDirs = ProfileFields::paths(table, "system_lib_dirs");
+            profile.binaryDirs = ProfileFields::paths(table, "binary_dirs");
+            if (const auto *env = (table)["environment"].as_table())
             {
-                stream << key << " = [";
-                for (std::size_t i = 0; i < values.size(); ++i)
+                for (const auto &[key, value] : *env)
                 {
-                    if (i != 0)
+                    if (auto text = value.value<std::string>())
                     {
-                        stream << ", ";
+                        profile.environment[std::string(key.str())] = *text;
                     }
-                    stream << toml::value<std::string>(values[i].string());
                 }
-                stream << "]\n";
             }
+            return profile;
+        }
 
-            static void writeStrings(std::ostringstream &stream, const char *key,
-                                     const std::vector<std::string> &values)
+        static void writePaths(std::ostringstream &stream, const char *key,
+                               const std::vector<std::filesystem::path> &values)
+        {
+            stream << key << " = [";
+            for (std::size_t i = 0; i < values.size(); ++i)
             {
-                stream << key << " = [";
-                for (std::size_t i = 0; i < values.size(); ++i)
+                if (i != 0)
                 {
-                    if (i != 0)
-                    {
-                        stream << ", ";
-                    }
-                    stream << toml::value<std::string>(values[i]);
+                    stream << ", ";
                 }
-                stream << "]\n";
+                stream << toml::value<std::string>(values[i].string());
             }
+            stream << "]\n";
+        }
 
-            static std::vector<std::filesystem::path> paths(const toml::table &table, const char *key)
+        static void writeStrings(std::ostringstream &stream, const char *key, const std::vector<std::string> &values)
+        {
+            stream << key << " = [";
+            for (std::size_t i = 0; i < values.size(); ++i)
             {
-                std::vector<std::filesystem::path> values;
-                const auto *array = table[key].as_array();
-                if (!array)
+                if (i != 0)
                 {
-                    return values;
+                    stream << ", ";
                 }
-                for (const auto &item : *array)
-                {
-                    if (auto value = item.value<std::string>())
-                    {
-                        values.emplace_back(*value);
-                    }
-                }
+                stream << toml::value<std::string>(values[i]);
+            }
+            stream << "]\n";
+        }
+
+        static std::vector<std::filesystem::path> paths(const toml::table &table, const char *key)
+        {
+            std::vector<std::filesystem::path> values;
+            const auto *array = table[key].as_array();
+            if (!array)
+            {
                 return values;
             }
-
-            static std::vector<std::string> strings(const toml::table &table, const char *key)
+            for (const auto &item : *array)
             {
-                std::vector<std::string> values;
-                const auto *array = table[key].as_array();
-                if (!array)
+                if (auto value = item.value<std::string>())
                 {
-                    return values;
+                    values.emplace_back(*value);
                 }
-                for (const auto &item : *array)
-                {
-                    if (auto value = item.value<std::string>())
-                    {
-                        values.push_back(*value);
-                    }
-                }
+            }
+            return values;
+        }
+
+        static std::vector<std::string> strings(const toml::table &table, const char *key)
+        {
+            std::vector<std::string> values;
+            const auto *array = table[key].as_array();
+            if (!array)
+            {
                 return values;
             }
-
-            static std::string string(const toml::table &table, const char *key)
+            for (const auto &item : *array)
             {
-                return table[key].value_or("");
+                if (auto value = item.value<std::string>())
+                {
+                    values.push_back(*value);
+                }
             }
+            return values;
+        }
 
-            static std::filesystem::path path(const toml::table &table, const char *key)
-            {
-                return std::filesystem::path(ProfileFields::string(table, key));
-            }
-        };
-    }
-
-    namespace
-    {
-        class ProfileEnvironment final
+        static std::string string(const toml::table &table, const char *key)
         {
-        public:
-            static std::string value(const std::string &key)
-            {
-#ifdef _WIN32
-                char *value = nullptr;
-                std::size_t size = 0;
-                if (_dupenv_s(&value, &size, key.c_str()) != 0 || !value)
-                {
-                    return {};
-                }
-                std::string result(value);
-                std::free(value);
-                return result;
-#else
-                const char *value = std::getenv(key.c_str());
-                return value ? std::string(value) : std::string{};
-#endif
-            }
+            return table[key].value_or("");
+        }
 
-            static std::filesystem::path home()
-            {
-#ifdef _WIN32
-                auto home = ProfileEnvironment::value("USERPROFILE");
-#else
-                auto home = ProfileEnvironment::value("HOME");
-#endif
-                return home.empty() ? std::filesystem::path{} : std::filesystem::path(home);
-            }
-
-            static void replace(std::string &value, const std::string &from, const std::string &to)
-            {
-                std::size_t pos = 0;
-                while ((pos = value.find(from, pos)) != std::string::npos)
-                {
-                    value.replace(pos, from.size(), to);
-                    pos += to.size();
-                }
-            }
-
-            static std::string expand(std::string value, const std::filesystem::path &workspaceRoot,
-                                      std::vector<std::string> &missing)
-            {
-                std::size_t pos = 0;
-                while ((pos = value.find("$env{", pos)) != std::string::npos)
-                {
-                    const auto end = value.find('}', pos + 5);
-                    if (end == std::string::npos)
-                    {
-                        break;
-                    }
-                    const auto key = value.substr(pos + 5, end - (pos + 5));
-                    const auto env = ProfileEnvironment::value(key);
-                    if (env.empty())
-                    {
-                        missing.push_back("missing_env:" + key);
-                    }
-                    value.replace(pos, end - pos + 1, env);
-                    pos += env.size();
-                }
-                pos = 0;
-                while ((pos = value.find("${env:", pos)) != std::string::npos)
-                {
-                    const auto end = value.find('}', pos + 6);
-                    if (end == std::string::npos)
-                    {
-                        break;
-                    }
-                    const auto key = value.substr(pos + 6, end - (pos + 6));
-                    const auto env = ProfileEnvironment::value(key);
-                    if (env.empty())
-                    {
-                        missing.push_back("missing_env:" + key);
-                    }
-                    value.replace(pos, end - pos + 1, env);
-                    pos += env.size();
-                }
-                ProfileEnvironment::replace(value, "$workspace", workspaceRoot.string());
-                ProfileEnvironment::replace(value, "$home", ProfileEnvironment::home().string());
-                return value;
-            }
-
-            static void path(std::filesystem::path &path, const std::filesystem::path &workspaceRoot,
-                             std::vector<std::string> &missing)
-            {
-                if (!path.empty())
-                {
-                    path = std::filesystem::path(ProfileEnvironment::expand(path.string(), workspaceRoot, missing));
-                }
-            }
-
-            static void paths(std::vector<std::filesystem::path> &paths, const std::filesystem::path &workspaceRoot,
-                              std::vector<std::string> &missing)
-            {
-                for (auto &path : paths)
-                {
-                    ProfileEnvironment::path(path, workspaceRoot, missing);
-                }
-            }
-        };
-    }
-
-    namespace
-    {
-        class ProfileValidation final
+        static std::filesystem::path path(const toml::table &table, const char *key)
         {
-        public:
-            static void addMissing(std::vector<std::string> &missing, const std::string &value)
+            return std::filesystem::path(ProfileFields::string(table, key));
+        }
+    };
+
+    class ProfileEnvironment final
+    {
+    public:
+        static std::string value(const std::string &key)
+        {
+#ifdef _WIN32
+            char *value = nullptr;
+            std::size_t size = 0;
+            if (_dupenv_s(&value, &size, key.c_str()) != 0 || !value)
             {
-                if (std::find(missing.begin(), missing.end(), value) == missing.end())
+                return {};
+            }
+            std::string result(value);
+            std::free(value);
+            return result;
+#else
+            const char *value = std::getenv(key.c_str());
+            return value ? std::string(value) : std::string{};
+#endif
+        }
+
+        static std::filesystem::path home()
+        {
+#ifdef _WIN32
+            auto home = ProfileEnvironment::value("USERPROFILE");
+#else
+            auto home = ProfileEnvironment::value("HOME");
+#endif
+            return home.empty() ? std::filesystem::path{} : std::filesystem::path(home);
+        }
+
+        static void replace(std::string &value, const std::string &from, const std::string &to)
+        {
+            std::size_t pos = 0;
+            while ((pos = value.find(from, pos)) != std::string::npos)
+            {
+                value.replace(pos, from.size(), to);
+                pos += to.size();
+            }
+        }
+
+        static std::string expand(std::string value, const std::filesystem::path &workspaceRoot,
+                                  std::vector<std::string> &missing)
+        {
+            std::size_t pos = 0;
+            while ((pos = value.find("$env{", pos)) != std::string::npos)
+            {
+                const auto end = value.find('}', pos + 5);
+                if (end == std::string::npos)
                 {
-                    missing.push_back(value);
+                    break;
+                }
+                const auto key = value.substr(pos + 5, end - (pos + 5));
+                const auto env = ProfileEnvironment::value(key);
+                if (env.empty())
+                {
+                    missing.push_back("missing_env:" + key);
+                }
+                value.replace(pos, end - pos + 1, env);
+                pos += env.size();
+            }
+            pos = 0;
+            while ((pos = value.find("${env:", pos)) != std::string::npos)
+            {
+                const auto end = value.find('}', pos + 6);
+                if (end == std::string::npos)
+                {
+                    break;
+                }
+                const auto key = value.substr(pos + 6, end - (pos + 6));
+                const auto env = ProfileEnvironment::value(key);
+                if (env.empty())
+                {
+                    missing.push_back("missing_env:" + key);
+                }
+                value.replace(pos, end - pos + 1, env);
+                pos += env.size();
+            }
+            ProfileEnvironment::replace(value, "$workspace", workspaceRoot.string());
+            ProfileEnvironment::replace(value, "$home", ProfileEnvironment::home().string());
+            return value;
+        }
+
+        static void path(std::filesystem::path &path, const std::filesystem::path &workspaceRoot,
+                         std::vector<std::string> &missing)
+        {
+            if (!path.empty())
+            {
+                path = std::filesystem::path(ProfileEnvironment::expand(path.string(), workspaceRoot, missing));
+            }
+        }
+
+        static void paths(std::vector<std::filesystem::path> &paths, const std::filesystem::path &workspaceRoot,
+                          std::vector<std::string> &missing)
+        {
+            for (auto &path : paths)
+            {
+                ProfileEnvironment::path(path, workspaceRoot, missing);
+            }
+        }
+    };
+
+    class ProfileValidation final
+    {
+    public:
+        static void addMissing(std::vector<std::string> &missing, const std::string &value)
+        {
+            if (std::find(missing.begin(), missing.end(), value) == missing.end())
+            {
+                missing.push_back(value);
+            }
+        }
+
+        static bool exists(const std::filesystem::path &path)
+        {
+            return !path.empty() && File::exists(path);
+        }
+
+        static bool directories(const std::vector<std::filesystem::path> &paths)
+        {
+            return std::any_of(paths.begin(), paths.end(), [](const auto &path) { return File::dir(path); });
+        }
+
+        static bool hasRequiredMissing(const std::vector<std::string> &missing)
+        {
+            return std::any_of(missing.begin(), missing.end(),
+                               [](const auto &value) { return value.rfind("optional:", 0) != 0; });
+        }
+
+        static void expand(ToolchainProfile &profile, const std::filesystem::path &workspaceRoot,
+                           std::vector<std::string> &missing)
+        {
+            ProfileEnvironment::path(profile.compiler, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.cxxCompiler, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.linker, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.archiver, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.resourceCompiler, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.manifestTool, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.cmake, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.ninja, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.git, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.strip, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.ranlib, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.adb, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.java, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.javac, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.gradle, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.sdkRoot, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.sysroot, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.androidSdkRoot, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.androidNdkRoot, workspaceRoot, missing);
+            ProfileEnvironment::path(profile.jdkRoot, workspaceRoot, missing);
+            ProfileEnvironment::paths(profile.systemIncludeDirs, workspaceRoot, missing);
+            ProfileEnvironment::paths(profile.systemLibDirs, workspaceRoot, missing);
+            ProfileEnvironment::paths(profile.binaryDirs, workspaceRoot, missing);
+            for (auto &[_, value] : profile.environment)
+            {
+                value = ProfileEnvironment::expand(value, workspaceRoot, missing);
+            }
+        }
+
+        static void required(const ToolchainProfile &profile, std::vector<std::string> &missing)
+        {
+            if (profile.id.empty())
+            {
+                ProfileValidation::addMissing(missing, "id");
+            }
+            if (profile.platform.empty())
+            {
+                ProfileValidation::addMissing(missing, "platform");
+            }
+            if (profile.compilerKind.empty())
+            {
+                ProfileValidation::addMissing(missing, "compiler_kind");
+            }
+            if (profile.compiler.empty() || !ProfileValidation::exists(profile.compiler))
+            {
+                ProfileValidation::addMissing(missing, "compiler");
+            }
+            if (profile.cxxCompiler.empty() || !ProfileValidation::exists(profile.cxxCompiler))
+            {
+                ProfileValidation::addMissing(missing, "cxx_compiler");
+            }
+            if (profile.linker.empty() || !ProfileValidation::exists(profile.linker))
+            {
+                ProfileValidation::addMissing(missing, "linker");
+            }
+            if (profile.archiver.empty() || !ProfileValidation::exists(profile.archiver))
+            {
+                ProfileValidation::addMissing(missing, "archiver");
+            }
+            if (profile.ninja.empty() || !ProfileValidation::exists(profile.ninja))
+            {
+                ProfileValidation::addMissing(missing, "ninja");
+            }
+            if (profile.git.empty() || !ProfileValidation::exists(profile.git))
+            {
+                ProfileValidation::addMissing(missing, "optional:git");
+            }
+            if ((profile.platform == "windows" || profile.compilerKind == "msvc" ||
+                 profile.compilerKind == "clang-cl") &&
+                (!ProfileValidation::directories(profile.systemIncludeDirs) ||
+                 !ProfileValidation::directories(profile.systemLibDirs)))
+            {
+                if (!ProfileValidation::directories(profile.systemIncludeDirs))
+                {
+                    ProfileValidation::addMissing(missing, "include_dirs");
+                }
+                if (!ProfileValidation::directories(profile.systemLibDirs))
+                {
+                    ProfileValidation::addMissing(missing, "lib_dirs");
                 }
             }
+        }
 
-            static bool exists(const std::filesystem::path &path)
-            {
-                return !path.empty() && File::exists(path);
-            }
+        static void normalize(ToolchainProfile &profile, const std::filesystem::path &workspaceRoot)
+        {
+            std::vector<std::string> missing;
+            expand(profile, workspaceRoot, missing);
 
-            static bool directories(const std::vector<std::filesystem::path> &paths)
+            required(profile, missing);
+            if (profile.platform == "android" || profile.sdkKind == "android-ndk")
             {
-                return std::any_of(paths.begin(), paths.end(),
-                                   [](const auto &path)
-                                   {
-                                       return File::dir(path);
-                                   });
-            }
-
-            static bool hasRequiredMissing(const std::vector<std::string> &missing)
-            {
-                return std::any_of(missing.begin(), missing.end(),
-                                   [](const auto &value)
-                                   {
-                                       return value.rfind("optional:", 0) != 0;
-                                   });
-            }
-
-            static void expand(ToolchainProfile &profile, const std::filesystem::path &workspaceRoot,
-                               std::vector<std::string> &missing)
-            {
-                ProfileEnvironment::path(profile.compiler, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.cxxCompiler, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.linker, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.archiver, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.resourceCompiler, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.manifestTool, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.cmake, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.ninja, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.git, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.strip, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.ranlib, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.adb, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.java, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.javac, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.gradle, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.sdkRoot, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.sysroot, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.androidSdkRoot, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.androidNdkRoot, workspaceRoot, missing);
-                ProfileEnvironment::path(profile.jdkRoot, workspaceRoot, missing);
-                ProfileEnvironment::paths(profile.systemIncludeDirs, workspaceRoot, missing);
-                ProfileEnvironment::paths(profile.systemLibDirs, workspaceRoot, missing);
-                ProfileEnvironment::paths(profile.binaryDirs, workspaceRoot, missing);
-                for (auto &[_, value] : profile.environment)
+                if (profile.androidSdkRoot.empty() || !File::dir(profile.androidSdkRoot))
                 {
-                    value = ProfileEnvironment::expand(value, workspaceRoot, missing);
+                    ProfileValidation::addMissing(missing, "android_sdk_root");
+                }
+                if (profile.androidNdkRoot.empty() || !File::dir(profile.androidNdkRoot))
+                {
+                    ProfileValidation::addMissing(missing, "android_ndk_root");
+                }
+                if (profile.androidAbi.empty())
+                {
+                    ProfileValidation::addMissing(missing, "android_abi");
+                }
+                if (profile.androidApi.empty())
+                {
+                    ProfileValidation::addMissing(missing, "android_api");
+                }
+                if (profile.sysroot.empty() || !File::dir(profile.sysroot))
+                {
+                    ProfileValidation::addMissing(missing, "sysroot");
+                }
+                if (profile.targetTriple.empty())
+                {
+                    ProfileValidation::addMissing(missing, "target_triple");
                 }
             }
-
-            static void required(const ToolchainProfile &profile, std::vector<std::string> &missing)
-            {
-                if (profile.id.empty())
-                {
-                    ProfileValidation::addMissing(missing, "id");
-                }
-                if (profile.platform.empty())
-                {
-                    ProfileValidation::addMissing(missing, "platform");
-                }
-                if (profile.compilerKind.empty())
-                {
-                    ProfileValidation::addMissing(missing, "compiler_kind");
-                }
-                if (profile.compiler.empty() || !ProfileValidation::exists(profile.compiler))
-                {
-                    ProfileValidation::addMissing(missing, "compiler");
-                }
-                if (profile.cxxCompiler.empty() || !ProfileValidation::exists(profile.cxxCompiler))
-                {
-                    ProfileValidation::addMissing(missing, "cxx_compiler");
-                }
-                if (profile.linker.empty() || !ProfileValidation::exists(profile.linker))
-                {
-                    ProfileValidation::addMissing(missing, "linker");
-                }
-                if (profile.archiver.empty() || !ProfileValidation::exists(profile.archiver))
-                {
-                    ProfileValidation::addMissing(missing, "archiver");
-                }
-                if (profile.ninja.empty() || !ProfileValidation::exists(profile.ninja))
-                {
-                    ProfileValidation::addMissing(missing, "ninja");
-                }
-                if (profile.git.empty() || !ProfileValidation::exists(profile.git))
-                {
-                    ProfileValidation::addMissing(missing, "optional:git");
-                }
-                if ((profile.platform == "windows" || profile.compilerKind == "msvc" ||
-                     profile.compilerKind == "clang-cl") &&
-                    (!ProfileValidation::directories(profile.systemIncludeDirs) ||
-                     !ProfileValidation::directories(profile.systemLibDirs)))
-                {
-                    if (!ProfileValidation::directories(profile.systemIncludeDirs))
-                    {
-                        ProfileValidation::addMissing(missing, "include_dirs");
-                    }
-                    if (!ProfileValidation::directories(profile.systemLibDirs))
-                    {
-                        ProfileValidation::addMissing(missing, "lib_dirs");
-                    }
-                }
-            }
-
-            static void normalize(ToolchainProfile &profile, const std::filesystem::path &workspaceRoot)
-            {
-                std::vector<std::string> missing;
-                expand(profile, workspaceRoot, missing);
-
-                required(profile, missing);
-                if (profile.platform == "android" || profile.sdkKind == "android-ndk")
-                {
-                    if (profile.androidSdkRoot.empty() || !File::dir(profile.androidSdkRoot))
-                    {
-                        ProfileValidation::addMissing(missing, "android_sdk_root");
-                    }
-                    if (profile.androidNdkRoot.empty() || !File::dir(profile.androidNdkRoot))
-                    {
-                        ProfileValidation::addMissing(missing, "android_ndk_root");
-                    }
-                    if (profile.androidAbi.empty())
-                    {
-                        ProfileValidation::addMissing(missing, "android_abi");
-                    }
-                    if (profile.androidApi.empty())
-                    {
-                        ProfileValidation::addMissing(missing, "android_api");
-                    }
-                    if (profile.sysroot.empty() || !File::dir(profile.sysroot))
-                    {
-                        ProfileValidation::addMissing(missing, "sysroot");
-                    }
-                    if (profile.targetTriple.empty())
-                    {
-                        ProfileValidation::addMissing(missing, "target_triple");
-                    }
-                }
-                profile.missing = std::move(missing);
-                profile.complete = !ProfileValidation::hasRequiredMissing(profile.missing);
-            }
-        };
-    }
+            profile.missing = std::move(missing);
+            profile.complete = !ProfileValidation::hasRequiredMissing(profile.missing);
+        }
+    };
 
     bool ToolchainRegistry::write(const std::filesystem::path &path, const std::vector<ToolchainProfile> &profiles,
                                   DiagnosticSink &diagnostics)
@@ -632,37 +616,34 @@ namespace rhodium
         return Path::stateRoot(ProfileEnvironment::home()) / "toolchains.toml";
     }
 
-    namespace
+    class RegistryPaths final
     {
-        class RegistryPaths final
+    public:
+        static std::vector<std::pair<ToolchainSource, std::filesystem::path>> sources(
+            const std::filesystem::path &workspaceRoot)
         {
-        public:
-            static std::vector<std::pair<ToolchainSource, std::filesystem::path>> sources(
-                const std::filesystem::path &workspaceRoot)
-            {
-                return {
-                    {ToolchainSource::AutoDetected, Path::stateRoot(workspaceRoot) / "toolchains" / "host.toml"},
-                    {ToolchainSource::GlobalUser, ToolchainRegistry::globalPath()},
-                    {ToolchainSource::Workspace, workspaceRoot / "config" / "toolchains.toml"},
-                    {ToolchainSource::Workspace, workspaceRoot / "toolchains.toml"},
-                    {ToolchainSource::ProjectUser, ToolchainRegistry::projectPath(workspaceRoot)},
-                };
-            }
+            return {
+                {ToolchainSource::AutoDetected, Path::stateRoot(workspaceRoot) / "toolchains" / "host.toml"},
+                {ToolchainSource::GlobalUser, ToolchainRegistry::globalPath()},
+                {ToolchainSource::Workspace, workspaceRoot / "config" / "toolchains.toml"},
+                {ToolchainSource::Workspace, workspaceRoot / "toolchains.toml"},
+                {ToolchainSource::ProjectUser, ToolchainRegistry::projectPath(workspaceRoot)},
+            };
+        }
 
-            static std::filesystem::path writable(const std::filesystem::path &workspaceRoot, ToolchainSource source)
+        static std::filesystem::path writable(const std::filesystem::path &workspaceRoot, ToolchainSource source)
+        {
+            if (source == ToolchainSource::ProjectUser)
             {
-                if (source == ToolchainSource::ProjectUser)
-                {
-                    return ToolchainRegistry::projectPath(workspaceRoot);
-                }
-                if (source == ToolchainSource::GlobalUser)
-                {
-                    return ToolchainRegistry::globalPath();
-                }
-                return {};
+                return ToolchainRegistry::projectPath(workspaceRoot);
             }
-        };
-    }
+            if (source == ToolchainSource::GlobalUser)
+            {
+                return ToolchainRegistry::globalPath();
+            }
+            return {};
+        }
+    };
 
     std::vector<LoadedToolchainProfile> ToolchainRegistry::sources(const std::filesystem::path &workspaceRoot,
                                                                    DiagnosticSink &diagnostics)
@@ -773,4 +754,4 @@ namespace rhodium
         }
         return ToolchainRegistry::write(path, profiles, diagnostics);
     }
-}
+} // namespace rhodium

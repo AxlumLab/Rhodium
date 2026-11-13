@@ -16,272 +16,268 @@
 
 namespace rhodium
 {
-    namespace
+
+    class DependencyOptions final
     {
-        class DependencyOptions final
+    public:
+        static bool isArchive(const std::string &source)
         {
-        public:
-            static bool isArchive(const std::string &source)
+            auto lower = StringUtils::toLower(source);
+            const auto query = lower.find_first_of("?#");
+            if (query != std::string::npos)
             {
-                auto lower = StringUtils::toLower(source);
-                const auto query = lower.find_first_of("?#");
-                if (query != std::string::npos)
-                {
-                    lower = lower.substr(0, query);
-                }
-                for (const auto &suffix :
-                     {".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", ".7z"})
-                {
-                    const std::string suffixText = suffix;
-                    if (lower.size() >= suffixText.size() &&
-                        lower.substr(lower.size() - suffixText.size()) == suffixText)
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                lower = lower.substr(0, query);
             }
-
-            static bool isGit(const std::string &source)
+            for (const auto &suffix :
+                 {".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", ".7z"})
             {
-                const auto lower = StringUtils::toLower(source);
-                return lower.rfind("git@", 0) == 0 || lower.rfind("ssh://", 0) == 0 || lower.rfind("git://", 0) == 0 ||
-                       (lower.size() >= 4 && lower.substr(lower.size() - 4) == ".git") ||
-                       lower.rfind("github.com/", 0) == 0 || lower.rfind("https://github.com/", 0) == 0;
+                const std::string suffixText = suffix;
+                if (lower.size() >= suffixText.size() && lower.substr(lower.size() - suffixText.size()) == suffixText)
+                {
+                    return true;
+                }
             }
+            return false;
+        }
 
-            static std::string sourceType(const std::string &source, sol::table options, bool local,
-                                          const std::filesystem::path &workspaceRoot)
+        static bool isGit(const std::string &source)
+        {
+            const auto lower = StringUtils::toLower(source);
+            return lower.rfind("git@", 0) == 0 || lower.rfind("ssh://", 0) == 0 || lower.rfind("git://", 0) == 0 ||
+                   (lower.size() >= 4 && lower.substr(lower.size() - 4) == ".git") ||
+                   lower.rfind("github.com/", 0) == 0 || lower.rfind("https://github.com/", 0) == 0;
+        }
+
+        static std::string sourceType(const std::string &source, sol::table options, bool local,
+                                      const std::filesystem::path &workspaceRoot)
+        {
+            const auto explicitType = LuaValueReader::string(options, "source_type");
+            if (!explicitType.empty())
             {
-                const auto explicitType = LuaValueReader::string(options, "source_type");
-                if (!explicitType.empty())
-                {
-                    return StringUtils::toLower(explicitType);
-                }
-                if (local)
-                {
-                    return "local";
-                }
-                if (DependencyOptions::isArchive(source))
-                {
-                    return "archive";
-                }
-                if (DependencyOptions::isGit(source))
-                {
-                    return "git";
-                }
-                auto path = std::filesystem::path(source);
-                if (path.is_relative())
-                {
-                    path = workspaceRoot / path;
-                }
-                if (std::filesystem::is_directory(path))
-                {
-                    return "local";
-                }
+                return StringUtils::toLower(explicitType);
+            }
+            if (local)
+            {
+                return "local";
+            }
+            if (DependencyOptions::isArchive(source))
+            {
+                return "archive";
+            }
+            if (DependencyOptions::isGit(source))
+            {
                 return "git";
             }
-
-            static std::string name(const std::string &source)
+            auto path = std::filesystem::path(source);
+            if (path.is_relative())
             {
-                auto text = source;
-                while (!text.empty() && (text.back() == '/' || text.back() == '\\'))
-                {
-                    text.pop_back();
-                }
-                auto slash = text.find_last_of("/\\:");
-                auto name = slash == std::string::npos ? text : text.substr(slash + 1);
-                if (name.size() > 4 && name.substr(name.size() - 4) == ".git")
-                {
-                    name.resize(name.size() - 4);
-                }
-                return name;
+                path = workspaceRoot / path;
             }
-
-            static void cmake(sol::table options, DependencyDesc &dependency)
+            if (std::filesystem::is_directory(path))
             {
-                sol::object cmakeValue = options["cmake"];
-                if (!cmakeValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table cmake = cmakeValue.as<sol::table>();
-                dependency.cmake.generator = LuaValueReader::string(cmake, "generator", dependency.cmake.generator);
-                dependency.cmake.buildType = LuaValueReader::string(cmake, "build_type", dependency.cmake.buildType);
-                dependency.cmake.configureArgs = LuaValueReader::array(cmake, "configure_args");
-                dependency.cmake.buildArgs = LuaValueReader::array(cmake, "build_args");
-                dependency.cmake.buildTargets = LuaValueReader::array(cmake, "build_targets");
-                dependency.cmake.installArgs = LuaValueReader::array(cmake, "install_args");
-                dependency.cmake.env = LuaValueReader::map(cmake, "env");
-                dependency.cmake.toolchainFile =
-                    LuaValueReader::string(cmake, "toolchain_file", dependency.cmake.toolchainFile);
-                dependency.cmake.install = LuaValueReader::boolean(cmake, "install", dependency.cmake.install);
-                dependency.cmake.installTarget =
-                    LuaValueReader::string(cmake, "install_target", dependency.cmake.installTarget);
+                return "local";
+            }
+            return "git";
+        }
 
-                sol::object optionsValue = cmake["options"];
-                if (optionsValue.is<sol::table>())
+        static std::string name(const std::string &source)
+        {
+            auto text = source;
+            while (!text.empty() && (text.back() == '/' || text.back() == '\\'))
+            {
+                text.pop_back();
+            }
+            auto slash = text.find_last_of("/\\:");
+            auto name = slash == std::string::npos ? text : text.substr(slash + 1);
+            if (name.size() > 4 && name.substr(name.size() - 4) == ".git")
+            {
+                name.resize(name.size() - 4);
+            }
+            return name;
+        }
+
+        static void cmake(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object cmakeValue = options["cmake"];
+            if (!cmakeValue.is<sol::table>())
+            {
+                return;
+            }
+            sol::table cmake = cmakeValue.as<sol::table>();
+            dependency.cmake.generator = LuaValueReader::string(cmake, "generator", dependency.cmake.generator);
+            dependency.cmake.buildType = LuaValueReader::string(cmake, "build_type", dependency.cmake.buildType);
+            dependency.cmake.configureArgs = LuaValueReader::array(cmake, "configure_args");
+            dependency.cmake.buildArgs = LuaValueReader::array(cmake, "build_args");
+            dependency.cmake.buildTargets = LuaValueReader::array(cmake, "build_targets");
+            dependency.cmake.installArgs = LuaValueReader::array(cmake, "install_args");
+            dependency.cmake.env = LuaValueReader::map(cmake, "env");
+            dependency.cmake.toolchainFile =
+                LuaValueReader::string(cmake, "toolchain_file", dependency.cmake.toolchainFile);
+            dependency.cmake.install = LuaValueReader::boolean(cmake, "install", dependency.cmake.install);
+            dependency.cmake.installTarget =
+                LuaValueReader::string(cmake, "install_target", dependency.cmake.installTarget);
+
+            sol::object optionsValue = cmake["options"];
+            if (optionsValue.is<sol::table>())
+            {
+                sol::table optionTable = optionsValue.as<sol::table>();
+                for (const auto &item : optionTable)
                 {
-                    sol::table optionTable = optionsValue.as<sol::table>();
-                    for (const auto &item : optionTable)
+                    if (item.first.is<std::string>())
                     {
-                        if (item.first.is<std::string>())
-                        {
-                            dependency.cmake.options[item.first.as<std::string>()] = LuaValueReader::text(item.second);
-                        }
+                        dependency.cmake.options[item.first.as<std::string>()] = LuaValueReader::text(item.second);
                     }
                 }
-                dependency.buildOptions = dependency.cmake.options;
             }
+            dependency.buildOptions = dependency.cmake.options;
+        }
 
-            static void make(sol::table options, DependencyDesc &dependency)
+        static void make(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object makeValue = options["make"];
+            if (!makeValue.is<sol::table>())
             {
-                sol::object makeValue = options["make"];
-                if (!makeValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table make = makeValue.as<sol::table>();
-                dependency.make.executable = LuaValueReader::string(make, "executable", dependency.make.executable);
-                dependency.make.jobs = LuaValueReader::integer(make, "jobs", dependency.make.jobs);
-                dependency.make.args = LuaValueReader::array(make, "args");
-                dependency.make.targets = LuaValueReader::array(make, "targets");
-                dependency.make.installTargets = LuaValueReader::array(make, "install_targets");
-                dependency.make.installArgs = LuaValueReader::array(make, "install_args");
-                dependency.make.env = LuaValueReader::map(make, "env");
+                return;
             }
+            sol::table make = makeValue.as<sol::table>();
+            dependency.make.executable = LuaValueReader::string(make, "executable", dependency.make.executable);
+            dependency.make.jobs = LuaValueReader::integer(make, "jobs", dependency.make.jobs);
+            dependency.make.args = LuaValueReader::array(make, "args");
+            dependency.make.targets = LuaValueReader::array(make, "targets");
+            dependency.make.installTargets = LuaValueReader::array(make, "install_targets");
+            dependency.make.installArgs = LuaValueReader::array(make, "install_args");
+            dependency.make.env = LuaValueReader::map(make, "env");
+        }
 
-            static void configure(sol::table options, DependencyDesc &dependency)
+        static void configure(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object configureValue = options["configure"];
+            if (!configureValue.is<sol::table>())
             {
-                sol::object configureValue = options["configure"];
-                if (!configureValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table configure = configureValue.as<sol::table>();
-                dependency.configure.script = LuaValueReader::string(configure, "script", dependency.configure.script);
-                dependency.configure.args = LuaValueReader::array(configure, "args");
-                dependency.configure.env = LuaValueReader::map(configure, "env");
+                return;
             }
+            sol::table configure = configureValue.as<sol::table>();
+            dependency.configure.script = LuaValueReader::string(configure, "script", dependency.configure.script);
+            dependency.configure.args = LuaValueReader::array(configure, "args");
+            dependency.configure.env = LuaValueReader::map(configure, "env");
+        }
 
-            static void commands(sol::table options, DependencyDesc &dependency)
+        static void commands(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object commandsValue = options["commands"];
+            if (!commandsValue.is<sol::table>())
             {
-                sol::object commandsValue = options["commands"];
-                if (!commandsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table commands = commandsValue.as<sol::table>();
-                dependency.commands.configure = LuaValueReader::array(commands, "configure");
-                dependency.commands.build = LuaValueReader::array(commands, "build");
-                dependency.commands.install = LuaValueReader::array(commands, "install");
+                return;
             }
+            sol::table commands = commandsValue.as<sol::table>();
+            dependency.commands.configure = LuaValueReader::array(commands, "configure");
+            dependency.commands.build = LuaValueReader::array(commands, "build");
+            dependency.commands.install = LuaValueReader::array(commands, "install");
+        }
 
-            static void artifacts(sol::table options, DependencyDesc &dependency)
+        static void artifacts(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object artifactsValue = options["artifacts"];
+            if (!artifactsValue.is<sol::table>())
             {
-                sol::object artifactsValue = options["artifacts"];
-                if (!artifactsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table artifacts = artifactsValue.as<sol::table>();
-                dependency.artifacts.mode = LuaValueReader::string(artifacts, "mode", dependency.artifacts.mode);
-                dependency.artifacts.includeDirs = LuaValueReader::array(
-                    artifacts, LuaValueReader::has(artifacts, "include_dirs") ? "include_dirs" : "includes");
-                dependency.artifacts.libDirs = LuaValueReader::array(artifacts, "lib_dirs");
-                dependency.artifacts.binDirs = LuaValueReader::array(artifacts, "bin_dirs");
-                dependency.artifacts.binFiles = LuaValueReader::array(artifacts, "bin_files");
-                dependency.artifacts.libs = LuaValueReader::array(artifacts, "libs");
-                LuaValueReader::setArrayOrMap(artifacts, "lib_files", dependency.artifacts.libFiles,
-                                              dependency.artifacts.libFilesByConfig);
-                dependency.artifacts.defines = LuaValueReader::array(artifacts, "defines");
-                dependency.artifacts.systemLibs = LuaValueReader::array(artifacts, "system_libs");
-                dependency.artifacts.frameworks = LuaValueReader::array(artifacts, "frameworks");
+                return;
             }
+            sol::table artifacts = artifactsValue.as<sol::table>();
+            dependency.artifacts.mode = LuaValueReader::string(artifacts, "mode", dependency.artifacts.mode);
+            dependency.artifacts.includeDirs = LuaValueReader::array(
+                artifacts, LuaValueReader::has(artifacts, "include_dirs") ? "include_dirs" : "includes");
+            dependency.artifacts.libDirs = LuaValueReader::array(artifacts, "lib_dirs");
+            dependency.artifacts.binDirs = LuaValueReader::array(artifacts, "bin_dirs");
+            dependency.artifacts.binFiles = LuaValueReader::array(artifacts, "bin_files");
+            dependency.artifacts.libs = LuaValueReader::array(artifacts, "libs");
+            LuaValueReader::setArrayOrMap(artifacts, "lib_files", dependency.artifacts.libFiles,
+                                          dependency.artifacts.libFilesByConfig);
+            dependency.artifacts.defines = LuaValueReader::array(artifacts, "defines");
+            dependency.artifacts.systemLibs = LuaValueReader::array(artifacts, "system_libs");
+            dependency.artifacts.frameworks = LuaValueReader::array(artifacts, "frameworks");
+        }
 
-            static void requirements(sol::table options, DependencyDesc &dependency)
+        static void requirements(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object requirementsValue = options["toolchain_requirements"];
+            if (!requirementsValue.is<sol::table>())
             {
-                sol::object requirementsValue = options["toolchain_requirements"];
-                if (!requirementsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table requirements = requirementsValue.as<sol::table>();
+                return;
+            }
+            sol::table requirements = requirementsValue.as<sol::table>();
+            dependency.toolchainRequirements.family =
+                StringUtils::toLower(LuaValueReader::string(requirements, "family"));
+            dependency.toolchainRequirements.abi = StringUtils::toLower(LuaValueReader::string(requirements, "abi"));
+            dependency.toolchainRequirements.binaryFormat =
+                StringUtils::toLower(LuaValueReader::string(requirements, "binary_format"));
+        }
+
+        static void overlayCommands(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object commandsValue = options["commands"];
+            if (!commandsValue.is<sol::table>())
+            {
+                return;
+            }
+            sol::table commands = commandsValue.as<sol::table>();
+            LuaValueReader::setArray(commands, "configure", dependency.commands.configure);
+            LuaValueReader::setArray(commands, "build", dependency.commands.build);
+            LuaValueReader::setArray(commands, "install", dependency.commands.install);
+        }
+
+        static void overlayArtifacts(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object artifactsValue = options["artifacts"];
+            if (!artifactsValue.is<sol::table>())
+            {
+                return;
+            }
+            sol::table artifacts = artifactsValue.as<sol::table>();
+            LuaValueReader::setString(artifacts, "mode", dependency.artifacts.mode);
+            if (LuaValueReader::has(artifacts, "include_dirs"))
+            {
+                LuaValueReader::setArray(artifacts, "include_dirs", dependency.artifacts.includeDirs);
+            }
+            else
+            {
+                LuaValueReader::setArray(artifacts, "includes", dependency.artifacts.includeDirs);
+            }
+            LuaValueReader::setArray(artifacts, "lib_dirs", dependency.artifacts.libDirs);
+            LuaValueReader::setArray(artifacts, "bin_dirs", dependency.artifacts.binDirs);
+            LuaValueReader::setArray(artifacts, "bin_files", dependency.artifacts.binFiles);
+            LuaValueReader::setArray(artifacts, "libs", dependency.artifacts.libs);
+            LuaValueReader::setArrayOrMap(artifacts, "lib_files", dependency.artifacts.libFiles,
+                                          dependency.artifacts.libFilesByConfig);
+            LuaValueReader::setArray(artifacts, "defines", dependency.artifacts.defines);
+            LuaValueReader::setArray(artifacts, "system_libs", dependency.artifacts.systemLibs);
+            LuaValueReader::setArray(artifacts, "frameworks", dependency.artifacts.frameworks);
+        }
+
+        static void overlayRequirements(sol::table options, DependencyDesc &dependency)
+        {
+            sol::object requirementsValue = options["toolchain_requirements"];
+            if (!requirementsValue.is<sol::table>())
+            {
+                return;
+            }
+            sol::table requirements = requirementsValue.as<sol::table>();
+            if (LuaValueReader::has(requirements, "family"))
+            {
                 dependency.toolchainRequirements.family =
                     StringUtils::toLower(LuaValueReader::string(requirements, "family"));
+            }
+            if (LuaValueReader::has(requirements, "abi"))
+            {
                 dependency.toolchainRequirements.abi =
                     StringUtils::toLower(LuaValueReader::string(requirements, "abi"));
+            }
+            if (LuaValueReader::has(requirements, "binary_format"))
+            {
                 dependency.toolchainRequirements.binaryFormat =
                     StringUtils::toLower(LuaValueReader::string(requirements, "binary_format"));
             }
-
-            static void overlayCommands(sol::table options, DependencyDesc &dependency)
-            {
-                sol::object commandsValue = options["commands"];
-                if (!commandsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table commands = commandsValue.as<sol::table>();
-                LuaValueReader::setArray(commands, "configure", dependency.commands.configure);
-                LuaValueReader::setArray(commands, "build", dependency.commands.build);
-                LuaValueReader::setArray(commands, "install", dependency.commands.install);
-            }
-
-            static void overlayArtifacts(sol::table options, DependencyDesc &dependency)
-            {
-                sol::object artifactsValue = options["artifacts"];
-                if (!artifactsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table artifacts = artifactsValue.as<sol::table>();
-                LuaValueReader::setString(artifacts, "mode", dependency.artifacts.mode);
-                if (LuaValueReader::has(artifacts, "include_dirs"))
-                {
-                    LuaValueReader::setArray(artifacts, "include_dirs", dependency.artifacts.includeDirs);
-                }
-                else
-                {
-                    LuaValueReader::setArray(artifacts, "includes", dependency.artifacts.includeDirs);
-                }
-                LuaValueReader::setArray(artifacts, "lib_dirs", dependency.artifacts.libDirs);
-                LuaValueReader::setArray(artifacts, "bin_dirs", dependency.artifacts.binDirs);
-                LuaValueReader::setArray(artifacts, "bin_files", dependency.artifacts.binFiles);
-                LuaValueReader::setArray(artifacts, "libs", dependency.artifacts.libs);
-                LuaValueReader::setArrayOrMap(artifacts, "lib_files", dependency.artifacts.libFiles,
-                                              dependency.artifacts.libFilesByConfig);
-                LuaValueReader::setArray(artifacts, "defines", dependency.artifacts.defines);
-                LuaValueReader::setArray(artifacts, "system_libs", dependency.artifacts.systemLibs);
-                LuaValueReader::setArray(artifacts, "frameworks", dependency.artifacts.frameworks);
-            }
-
-            static void overlayRequirements(sol::table options, DependencyDesc &dependency)
-            {
-                sol::object requirementsValue = options["toolchain_requirements"];
-                if (!requirementsValue.is<sol::table>())
-                {
-                    return;
-                }
-                sol::table requirements = requirementsValue.as<sol::table>();
-                if (LuaValueReader::has(requirements, "family"))
-                {
-                    dependency.toolchainRequirements.family =
-                        StringUtils::toLower(LuaValueReader::string(requirements, "family"));
-                }
-                if (LuaValueReader::has(requirements, "abi"))
-                {
-                    dependency.toolchainRequirements.abi =
-                        StringUtils::toLower(LuaValueReader::string(requirements, "abi"));
-                }
-                if (LuaValueReader::has(requirements, "binary_format"))
-                {
-                    dependency.toolchainRequirements.binaryFormat =
-                        StringUtils::toLower(LuaValueReader::string(requirements, "binary_format"));
-                }
-            }
-        };
-    }
+        }
+    };
 
     void LuaDependencyReader::overlay(sol::table options, DependencyDesc &dependency)
     {

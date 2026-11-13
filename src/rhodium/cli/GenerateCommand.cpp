@@ -16,95 +16,92 @@
 
 namespace rhodium
 {
-    namespace
+    class RestoredPackages final
     {
-        class RestoredPackages final
+    public:
+        struct Request
         {
-        public:
-            struct Request
+            const std::filesystem::path &workspaceRoot;
+            const std::string &toolchainId;
+            const std::string &configOption;
+            const std::vector<std::string> &cliOverrides;
+        };
+
+        struct Result
+        {
+            std::vector<ResolvedDependencyArtifact> packages;
+            CMakeDependencyExportMetadata metadata;
+            BuildModel model;
+        };
+
+        static bool load(const Request &request, Result &result, ConsoleDiagnosticSink &diagnostics)
+        {
+            const auto &[workspaceRoot, toolchainId, configOption, cliOverrides] = request;
+            BuildModel model;
+            if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
             {
-                const std::filesystem::path &workspaceRoot;
-                const std::string &toolchainId;
-                const std::string &configOption;
-                const std::vector<std::string> &cliOverrides;
-            };
-
-            struct Result
+                return false;
+            }
+            const auto config = CliWorkspace::config(model, configOption, diagnostics);
+            if (config.empty())
             {
-                std::vector<ResolvedDependencyArtifact> packages;
-                CMakeDependencyExportMetadata metadata;
-                BuildModel model;
-            };
-
-            static bool load(const Request &request, Result &result, ConsoleDiagnosticSink &diagnostics)
+                return false;
+            }
+            const auto effectiveToolchain = CliWorkspace::toolchain(workspaceRoot, toolchainId, diagnostics);
+            if (effectiveToolchain.empty())
             {
-                const auto &[workspaceRoot, toolchainId, configOption, cliOverrides] = request;
-                BuildModel model;
-                if (!CliWorkspace::load(workspaceRoot, model, diagnostics))
-                {
-                    return false;
-                }
-                const auto config = CliWorkspace::config(model, configOption, diagnostics);
-                if (config.empty())
-                {
-                    return false;
-                }
-                const auto effectiveToolchain = CliWorkspace::toolchain(workspaceRoot, toolchainId, diagnostics);
-                if (effectiveToolchain.empty())
-                {
-                    return false;
-                }
-                ToolchainProfile selectedToolchain;
-                if (!CliWorkspace::selectToolchain(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
-                {
-                    return false;
-                }
+                return false;
+            }
+            ToolchainProfile selectedToolchain;
+            if (!CliWorkspace::selectToolchain(workspaceRoot, effectiveToolchain, selectedToolchain, diagnostics))
+            {
+                return false;
+            }
 
-                DependencyOverrideSet overrides;
-                if (!CliWorkspace::overrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
-                {
-                    return false;
-                }
+            DependencyOverrideSet overrides;
+            if (!CliWorkspace::overrides(model, workspaceRoot, cliOverrides, overrides, diagnostics))
+            {
+                return false;
+            }
 
-                LockFile lockFile;
-                if (!LockFile::read(workspaceRoot / "tpkg.lock.toml", lockFile, diagnostics))
-                {
-                    return false;
-                }
-                if (!model.rootPackage.dependencies.empty() && lockFile.packages.empty())
+            LockFile lockFile;
+            if (!LockFile::read(Path::lockFile(workspaceRoot), lockFile, diagnostics))
+            {
+                return false;
+            }
+            if (!model.rootPackage.dependencies.empty() && lockFile.packages.empty())
+            {
+                diagnostics.error(CliWorkspace::missingDependencies(config, selectedToolchain.id));
+                return false;
+            }
+
+            PackageArtifactResolver packageResolver;
+            if (!packageResolver.load(lockFile, workspaceRoot, BuildSelection{config, selectedToolchain.id},
+                                      overrides, diagnostics))
+            {
+                return false;
+            }
+            for (const auto &dependency : model.rootPackage.dependencies)
+            {
+                if (!packageResolver.find(dependency.name))
                 {
                     diagnostics.error(CliWorkspace::missingDependencies(config, selectedToolchain.id));
                     return false;
                 }
-
-                PackageArtifactResolver packageResolver;
-                if (!packageResolver.load(lockFile, workspaceRoot, BuildSelection{config, selectedToolchain.id},
-                                          overrides, diagnostics))
-                {
-                    return false;
-                }
-                for (const auto &dependency : model.rootPackage.dependencies)
-                {
-                    if (!packageResolver.find(dependency.name))
-                    {
-                        diagnostics.error(CliWorkspace::missingDependencies(config, selectedToolchain.id));
-                        return false;
-                    }
-                }
-                result.packages = packageResolver.packages();
-                result.model = model;
-                {
-                    result.metadata.toolchainId = selectedToolchain.id;
-                    result.metadata.compilerKind = selectedToolchain.compilerKind;
-                    result.metadata.config = config;
-                    result.metadata.arch = selectedToolchain.targetArch;
-                    result.metadata.runtime = CliWorkspace::runtime(lockFile, config, selectedToolchain.id);
-                    result.metadata.linkage = CliWorkspace::linkage(lockFile, config, selectedToolchain.id);
-                }
-                return true;
             }
-        };
-    }
+            result.packages = packageResolver.packages();
+            result.model = model;
+            {
+                result.metadata.toolchainId = selectedToolchain.id;
+                result.metadata.compilerKind = selectedToolchain.compilerKind;
+                result.metadata.config = config;
+                result.metadata.arch = selectedToolchain.targetArch;
+                result.metadata.runtime = CliWorkspace::runtime(lockFile, config, selectedToolchain.id);
+                result.metadata.linkage = CliWorkspace::linkage(lockFile, config, selectedToolchain.id);
+            }
+            return true;
+        }
+    };
 
     int Commands::generate(const std::filesystem::path &workspaceRoot, const std::string &toolchainId,
                            const std::string &configOption, const std::filesystem::path &outputDir,

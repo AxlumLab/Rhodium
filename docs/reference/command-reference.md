@@ -151,7 +151,7 @@ rhodium clean [package] [options]
 | `--all` | Remove the active state directory (`.rhodium` or legacy `.tpkg`) |
 | `--artifacts` | Remove `.rhodium/artifacts` |
 | `--sources` | Remove `.rhodium/packages` source cache |
-| `--lock` | Remove `tpkg.lock.toml` |
+| `--lock` | Remove `rhodium.lock.toml` |
 
 ## `override`
 

@@ -10,7 +10,7 @@
 #include <string>
 #include <thread>
 
-namespace
+namespace rhodium::tests::workspaceLockTests
 {
     class WorkspaceLockTests : public ::testing::Test
     {
@@ -55,11 +55,12 @@ namespace
         ASSERT_TRUE(static_cast<bool>(outer));
         bool acquired = true;
         std::string error;
-        std::thread contender([&]
-                              {
-                                  rhodium::WorkspaceLock lock(root, &error);
-                                  acquired = static_cast<bool>(lock);
-                              });
+        std::thread contender(
+            [&]
+            {
+                rhodium::WorkspaceLock lock(root, &error);
+                acquired = static_cast<bool>(lock);
+            });
         contender.join();
         EXPECT_FALSE(acquired);
         EXPECT_NE(error.find("already in use"), std::string::npos);
@@ -78,4 +79,4 @@ namespace
         EXPECT_EQ(probe(), 0);
         EXPECT_TRUE(std::filesystem::is_empty(root));
     }
-}
+} // namespace rhodium::tests::workspaceLockTests

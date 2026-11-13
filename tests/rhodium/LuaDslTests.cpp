@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace
+namespace rhodium::tests::luaDslTests
 {
 
     std::filesystem::path makeTempDir()
@@ -132,7 +132,8 @@ module("Core")
         auto result = loader.load(manifest, diagnostics);
 
         EXPECT_FALSE(result.ok);
-        EXPECT_NE(diagnostics.diagnostics().dump().find("project build DSL 'module' is not supported"), std::string::npos);
+        EXPECT_NE(diagnostics.diagnostics().dump().find("project build DSL 'module' is not supported"),
+                  std::string::npos);
         std::filesystem::remove_all(dir);
     }
 
@@ -331,4 +332,4 @@ end)
         std::filesystem::remove_all(dir);
     }
 
-} // namespace
+} // namespace rhodium::tests::luaDslTests

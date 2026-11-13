@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
-namespace
+namespace rhodium::tests::buildModelTests
 {
 
     TEST(BuildModelTests, JsonWriterUsesDependencyManifestShape)
@@ -30,4 +30,4 @@ namespace
         EXPECT_EQ(json["package"]["dependencies"][0]["name"], "fmt");
     }
 
-} // namespace
+} // namespace rhodium::tests::buildModelTests

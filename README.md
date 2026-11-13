@@ -6,7 +6,7 @@ Rhodium is a cross-platform C/C++ dependency management system designed to serve
 
 It is **not** a replacement for CMake, Ninja, Visual Studio, Xcode, or any native build backend. Its job is to restore source, archive, local, or prebuilt dependencies; build dependency artifacts when needed; write a lock file for reproducibility; and generate CMake integration files that your normal CMake project can consume.
 
-The executable is `rhodium` (`rhodium.exe` on Windows). Rhodium reads `rhodium.lua` first and falls back to `tpkg.lua`. State uses an existing `.rhodium/` first, otherwise an existing `.tpkg/`, otherwise a new `.rhodium/`. Lockfiles remain `tpkg.lock.toml`. Generated CMake packages and imported targets use `rhodium` and `rhodium::`.
+The executable is `rhodium` (`rhodium.exe` on Windows). Rhodium reads `rhodium.lua` first and falls back to `tpkg.lua`. State uses an existing `.rhodium/` first, otherwise an existing `.tpkg/`, otherwise a new `.rhodium/`. New lockfiles use `rhodium.lock.toml`; an existing `tpkg.lock.toml` is reused when the new name is absent. Generated CMake packages and imported targets use `rhodium` and `rhodium::`.
 
 ## Project status
 

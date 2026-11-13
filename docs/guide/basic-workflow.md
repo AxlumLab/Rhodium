@@ -46,7 +46,7 @@ The selected toolchain is stored in local `.rhodium` state and should not be com
 rhodium restore --config debug
 ```
 
-This fetches sources, builds dependency packages if needed, exports artifacts, and updates `tpkg.lock.toml`.
+This fetches sources, builds dependency packages if needed, exports artifacts, and updates `rhodium.lock.toml`.
 
 ## 4. Generate CMake files
 
@@ -62,7 +62,7 @@ Commit:
 
 ```text
 rhodium.lua
-tpkg.lock.toml
+rhodium.lock.toml
 docs explaining required toolchains
 ```
 

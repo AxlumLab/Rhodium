@@ -20,74 +20,72 @@
 
 namespace rhodium
 {
-    namespace
-    {
-#ifdef _WIN32
-        std::wstring nativePath(const std::filesystem::path &path)
-        {
-            auto value = std::filesystem::absolute(path).lexically_normal().native();
-            if (value.rfind(L"\\\\?\\", 0) == 0)
-            {
-                return value;
-            }
-            return value.rfind(L"\\\\", 0) == 0 ? L"\\\\?\\UNC\\" + value.substr(2) : L"\\\\?\\" + value;
-        }
-#endif
-        struct PendingFile
-        {
-            std::filesystem::path path;
-            bool owned = false;
-#ifdef _WIN32
-            HANDLE handle = INVALID_HANDLE_VALUE;
-#else
-            int handle = -1;
-#endif
-            ~PendingFile()
-            {
-#ifdef _WIN32
-                if (handle != INVALID_HANDLE_VALUE)
-                {
-                    CloseHandle(handle);
-                }
-#else
-                if (handle != -1)
-                {
-                    close(handle);
-                }
-#endif
-                if (owned)
-                {
-                    std::error_code ignored;
-                    std::filesystem::remove(path, ignored);
-                }
-            }
-        };
 
-        std::filesystem::path writeDestination(std::filesystem::path path)
+#ifdef _WIN32
+    static std::wstring nativePath(const std::filesystem::path &path)
+    {
+        auto value = std::filesystem::absolute(path).lexically_normal().native();
+        if (value.rfind(L"\\\\?\\", 0) == 0)
         {
-            if (path.native().find(std::filesystem::path::value_type{}) != std::filesystem::path::string_type::npos)
-            {
-                throw std::invalid_argument("write destination contains a NUL character");
-            }
-            path = std::filesystem::absolute(path);
-            // Retain the established behavior of writing through config-file symlinks.
-            for (unsigned hops = 0; hops < 32; ++hops)
-            {
-                std::error_code ec;
-                const bool symlink = std::filesystem::is_symlink(path, ec);
-                if (ec && ec != std::errc::no_such_file_or_directory)
-                {
-                    throw std::system_error(ec, "inspect write destination");
-                }
-                if (!symlink)
-                {
-                    return path;
-                }
-                const auto target = std::filesystem::read_symlink(path);
-                path = target.is_absolute() ? target : path.parent_path() / target;
-            }
-            throw std::system_error(std::make_error_code(std::errc::too_many_symbolic_link_levels));
+            return value;
         }
+        return value.rfind(L"\\\\", 0) == 0 ? L"\\\\?\\UNC\\" + value.substr(2) : L"\\\\?\\" + value;
+    }
+#endif
+    struct PendingFile
+    {
+        std::filesystem::path path;
+        bool owned = false;
+#ifdef _WIN32
+        HANDLE handle = INVALID_HANDLE_VALUE;
+#else
+        int handle = -1;
+#endif
+        ~PendingFile()
+        {
+#ifdef _WIN32
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(handle);
+            }
+#else
+            if (handle != -1)
+            {
+                close(handle);
+            }
+#endif
+            if (owned)
+            {
+                std::error_code ignored;
+                std::filesystem::remove(path, ignored);
+            }
+        }
+    };
+
+    static std::filesystem::path writeDestination(std::filesystem::path path)
+    {
+        if (path.native().find(std::filesystem::path::value_type{}) != std::filesystem::path::string_type::npos)
+        {
+            throw std::invalid_argument("write destination contains a NUL character");
+        }
+        path = std::filesystem::absolute(path);
+        // Retain the established behavior of writing through config-file symlinks.
+        for (unsigned hops = 0; hops < 32; ++hops)
+        {
+            std::error_code ec;
+            const bool symlink = std::filesystem::is_symlink(path, ec);
+            if (ec && ec != std::errc::no_such_file_or_directory)
+            {
+                throw std::system_error(ec, "inspect write destination");
+            }
+            if (!symlink)
+            {
+                return path;
+            }
+            const auto target = std::filesystem::read_symlink(path);
+            path = target.is_absolute() ? target : path.parent_path() / target;
+        }
+        throw std::system_error(std::make_error_code(std::errc::too_many_symbolic_link_levels));
     }
 
     bool AtomicFile::write(const std::filesystem::path &path, const std::string &content, std::string *error)
@@ -279,4 +277,4 @@ namespace rhodium
             return false;
         }
     }
-}
+} // namespace rhodium

@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
 #include "rhodium/package/ToolchainContextResolver.hpp"
@@ -18,54 +18,52 @@
 
 namespace rhodium
 {
-    namespace
+
+    class BuildProfiles final
     {
-        class BuildProfiles final
+    public:
+        static std::vector<ToolchainProfile> load(const std::filesystem::path &workspaceRoot,
+                                                  DiagnosticSink &diagnostics)
         {
-        public:
-            static std::vector<ToolchainProfile> load(const std::filesystem::path &workspaceRoot,
-                                                      DiagnosticSink &diagnostics)
+            std::vector<ToolchainProfile> profiles = ToolchainDetector::host(workspaceRoot, diagnostics);
+            if (workspaceRoot.empty())
             {
-                std::vector<ToolchainProfile> profiles = ToolchainDetector::host(workspaceRoot, diagnostics);
-                if (workspaceRoot.empty())
-                {
-                    return profiles;
-                }
-
-                std::map<std::string, std::size_t> byId;
-                for (std::size_t index = 0; index < profiles.size(); ++index)
-                {
-                    if (!profiles[index].id.empty())
-                    {
-                        byId[profiles[index].id] = index;
-                    }
-                }
-
-                for (const auto &loaded : ToolchainRegistry::load(workspaceRoot, diagnostics))
-                {
-                    if (loaded.profile.id.empty())
-                    {
-                        continue;
-                    }
-                    const auto found = byId.find(loaded.profile.id);
-                    if (loaded.source == ToolchainSource::AutoDetected && found != byId.end())
-                    {
-                        continue;
-                    }
-                    if (found == byId.end())
-                    {
-                        byId[loaded.profile.id] = profiles.size();
-                        profiles.push_back(loaded.profile);
-                    }
-                    else
-                    {
-                        profiles[found->second] = loaded.profile;
-                    }
-                }
                 return profiles;
             }
-        };
-    }
+
+            std::map<std::string, std::size_t> byId;
+            for (std::size_t index = 0; index < profiles.size(); ++index)
+            {
+                if (!profiles[index].id.empty())
+                {
+                    byId[profiles[index].id] = index;
+                }
+            }
+
+            for (const auto &loaded : ToolchainRegistry::load(workspaceRoot, diagnostics))
+            {
+                if (loaded.profile.id.empty())
+                {
+                    continue;
+                }
+                const auto found = byId.find(loaded.profile.id);
+                if (loaded.source == ToolchainSource::AutoDetected && found != byId.end())
+                {
+                    continue;
+                }
+                if (found == byId.end())
+                {
+                    byId[loaded.profile.id] = profiles.size();
+                    profiles.push_back(loaded.profile);
+                }
+                else
+                {
+                    profiles[found->second] = loaded.profile;
+                }
+            }
+            return profiles;
+        }
+    };
 
     ToolchainSnapshot::ToolchainSnapshot(std::filesystem::path workspaceRoot) : workspaceRoot_(std::move(workspaceRoot))
     {
@@ -186,7 +184,9 @@ namespace rhodium
         class NullDiagnosticSink final : public DiagnosticSink
         {
         public:
-            void report(const Diagnostic &) override {}
+            void report(const Diagnostic &) override
+            {
+            }
         };
 
         NullDiagnosticSink diagnostics;

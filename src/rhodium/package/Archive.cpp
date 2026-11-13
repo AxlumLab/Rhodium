@@ -1,7 +1,7 @@
 /*
  * @Author: cubevlmu khfahqp@gmail.com
  * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved. 
+ * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
  */
 
 #include "rhodium/package/Archive.hpp"
@@ -330,10 +330,7 @@ namespace rhodium
         {
             auto text = path.filename().string();
             std::transform(text.begin(), text.end(), text.begin(),
-                           [](unsigned char c)
-                           {
-                               return static_cast<char>(std::tolower(c));
-                           });
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
             return text;
         }();
         for (const auto &suffix : {".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2"})
@@ -536,196 +533,192 @@ namespace rhodium
         return curl_version_info(CURLVERSION_NOW) != nullptr;
     }
 
-    namespace
+    class ArchiveRestore final
     {
-        class ArchiveRestore final
+    public:
+        ArchiveRestore(const DependencyDesc &dependency, const std::filesystem::path &workspaceRoot,
+                       const std::filesystem::path &cacheRoot, ArchiveFetchResult &result, DiagnosticSink &diagnostics)
+            : dependency(dependency), workspaceRoot(workspaceRoot), result(result), diagnostics(diagnostics),
+              archiveRoot(cacheRoot / "_archives" / Path::sanitizePackagePath(dependency.name) /
+                          Path::sanitizePackagePath(ArchiveData::key(dependency))),
+              downloadPath(archiveRoot / "download" / ArchiveData::filename(dependency.source)),
+              sourceDir(archiveRoot / "src"), tmp(archiveRoot / "src.tmp")
         {
-        public:
-            ArchiveRestore(const DependencyDesc &dependency, const std::filesystem::path &workspaceRoot,
-                           const std::filesystem::path &cacheRoot, ArchiveFetchResult &result,
-                           DiagnosticSink &diagnostics)
-                : dependency(dependency), workspaceRoot(workspaceRoot), result(result), diagnostics(diagnostics),
-                  archiveRoot(cacheRoot / "_archives" / Path::sanitizePackagePath(dependency.name) /
-                              Path::sanitizePackagePath(ArchiveData::key(dependency))),
-                  downloadPath(archiveRoot / "download" / ArchiveData::filename(dependency.source)),
-                  sourceDir(archiveRoot / "src"), tmp(archiveRoot / "src.tmp")
+        }
+
+        bool run()
+        {
+            result.archivePath = downloadPath;
+            result.sourceDir = sourceDir;
+            if (!acquire() || !verifyHash() || !hashPatches())
             {
+                return false;
             }
-
-            bool run()
+            if (ArchiveData::matches(sourceDir, dependency, result.archiveHash, patchHashes))
             {
-                result.archivePath = downloadPath;
-                result.sourceDir = sourceDir;
-                if (!acquire() || !verifyHash() || !hashPatches())
-                {
-                    return false;
-                }
-                if (ArchiveData::matches(sourceDir, dependency, result.archiveHash, patchHashes))
-                {
-                    result.patchHashes = patchHashes;
-                    diagnostics.info("archive source is up to date: " + dependency.name);
-                    return true;
-                }
-                return extract() && finalize();
-            }
-
-        private:
-            bool acquire()
-            {
-                if (!File::exists(downloadPath))
-                {
-                    if (ArchiveData::remote(dependency.source))
-                    {
-                        if (!ArchiveData::downloadRemote(dependency, downloadPath, diagnostics))
-                        {
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        const auto local = ArchiveData::local(workspaceRoot, dependency.source);
-                        if (!File::exists(local))
-                        {
-                            diagnostics.error("archive source is missing: " + local.string());
-                            return false;
-                        }
-                        if (!ArchiveData::copy(local, downloadPath, diagnostics))
-                        {
-                            return false;
-                        }
-                    }
-                }
-
+                result.patchHashes = patchHashes;
+                diagnostics.info("archive source is up to date: " + dependency.name);
                 return true;
             }
+            return extract() && finalize();
+        }
 
-            bool verifyHash()
+    private:
+        bool acquire()
+        {
+            if (!File::exists(downloadPath))
             {
-                std::string hashError;
-                result.archiveHash = Sha256::file(downloadPath, &hashError);
-                if (result.archiveHash.empty())
+                if (ArchiveData::remote(dependency.source))
                 {
-                    diagnostics.error("failed to hash archive " + downloadPath.string() + ": " + hashError);
-                    return false;
-                }
-                if (!dependency.sha256.empty() && !Sha256::equal(result.archiveHash, dependency.sha256))
-                {
-                    const auto badPath = downloadPath.string() + ".bad";
-                    std::filesystem::rename(downloadPath, badPath);
-                    diagnostics.error("sha256 mismatch for archive " + downloadPath.string() +
-                                      " expected=" + dependency.sha256 + " actual=" + result.archiveHash);
-                    return false;
-                }
-
-                return true;
-            }
-
-            bool hashPatches()
-            {
-                for (const auto &patch : dependency.patches)
-                {
-                    std::string patchError;
-                    const auto patchPath = std::filesystem::path(patch).is_absolute() ? std::filesystem::path(patch)
-                                                                                      : workspaceRoot / patch;
-                    const auto hash = Sha256::file(patchPath, &patchError);
-                    if (hash.empty())
-                    {
-                        diagnostics.error("failed to hash patch " + patchPath.string() + ": " + patchError);
-                        return false;
-                    }
-                    patchHashes.push_back(hash);
-                }
-
-                return true;
-            }
-
-            bool extract()
-            {
-                try
-                {
-                    std::filesystem::remove_all(tmp);
-                    std::filesystem::remove_all(sourceDir);
-                }
-                catch (const std::exception &ex)
-                {
-                    diagnostics.error("failed to clean archive extraction directory: " + std::string(ex.what()));
-                    return false;
-                }
-
-                ArchiveExtractor extractor;
-                if (!extractor.extract(downloadPath, tmp, dependency.stripComponents, diagnostics))
-                {
-                    std::filesystem::remove_all(tmp);
-                    if (!ArchiveData::remote(dependency.source) || !ArchiveData::remove(downloadPath))
-                    {
-                        return false;
-                    }
-
-                    diagnostics.warning("cached archive was invalid; re-downloading: " + dependency.name);
                     if (!ArchiveData::downloadRemote(dependency, downloadPath, diagnostics))
                     {
-                        return false;
-                    }
-
-                    if (!verifyHash())
-                    {
-                        return false;
-                    }
-
-                    if (!extractor.extract(downloadPath, tmp, dependency.stripComponents, diagnostics))
-                    {
-                        std::filesystem::remove_all(tmp);
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            bool finalize()
-            {
-                if (!dependency.patches.empty())
-                {
-                    PatchApplier patcher;
-                    if (!patcher.apply(tmp, workspaceRoot, PatchOptions{dependency.patches, dependency.stripComponents},
-                                       result.patchHashes, diagnostics))
-                    {
-                        std::filesystem::remove_all(tmp);
                         return false;
                     }
                 }
                 else
                 {
-                    result.patchHashes = patchHashes;
+                    const auto local = ArchiveData::local(workspaceRoot, dependency.source);
+                    if (!File::exists(local))
+                    {
+                        diagnostics.error("archive source is missing: " + local.string());
+                        return false;
+                    }
+                    if (!ArchiveData::copy(local, downloadPath, diagnostics))
+                    {
+                        return false;
+                    }
                 }
-                if (!ArchiveData::writeMarker(tmp, dependency, result.archiveHash, result.patchHashes, diagnostics))
+            }
+
+            return true;
+        }
+
+        bool verifyHash()
+        {
+            std::string hashError;
+            result.archiveHash = Sha256::file(downloadPath, &hashError);
+            if (result.archiveHash.empty())
+            {
+                diagnostics.error("failed to hash archive " + downloadPath.string() + ": " + hashError);
+                return false;
+            }
+            if (!dependency.sha256.empty() && !Sha256::equal(result.archiveHash, dependency.sha256))
+            {
+                const auto badPath = downloadPath.string() + ".bad";
+                std::filesystem::rename(downloadPath, badPath);
+                diagnostics.error("sha256 mismatch for archive " + downloadPath.string() +
+                                  " expected=" + dependency.sha256 + " actual=" + result.archiveHash);
+                return false;
+            }
+
+            return true;
+        }
+
+        bool hashPatches()
+        {
+            for (const auto &patch : dependency.patches)
+            {
+                std::string patchError;
+                const auto patchPath =
+                    std::filesystem::path(patch).is_absolute() ? std::filesystem::path(patch) : workspaceRoot / patch;
+                const auto hash = Sha256::file(patchPath, &patchError);
+                if (hash.empty())
+                {
+                    diagnostics.error("failed to hash patch " + patchPath.string() + ": " + patchError);
+                    return false;
+                }
+                patchHashes.push_back(hash);
+            }
+
+            return true;
+        }
+
+        bool extract()
+        {
+            try
+            {
+                std::filesystem::remove_all(tmp);
+                std::filesystem::remove_all(sourceDir);
+            }
+            catch (const std::exception &ex)
+            {
+                diagnostics.error("failed to clean archive extraction directory: " + std::string(ex.what()));
+                return false;
+            }
+
+            ArchiveExtractor extractor;
+            if (!extractor.extract(downloadPath, tmp, dependency.stripComponents, diagnostics))
+            {
+                std::filesystem::remove_all(tmp);
+                if (!ArchiveData::remote(dependency.source) || !ArchiveData::remove(downloadPath))
+                {
+                    return false;
+                }
+
+                diagnostics.warning("cached archive was invalid; re-downloading: " + dependency.name);
+                if (!ArchiveData::downloadRemote(dependency, downloadPath, diagnostics))
+                {
+                    return false;
+                }
+
+                if (!verifyHash())
+                {
+                    return false;
+                }
+
+                if (!extractor.extract(downloadPath, tmp, dependency.stripComponents, diagnostics))
                 {
                     std::filesystem::remove_all(tmp);
                     return false;
                 }
-                try
-                {
-                    std::filesystem::rename(tmp, sourceDir);
-                }
-                catch (const std::exception &ex)
-                {
-                    diagnostics.error("failed to finalize archive source directory: " + std::string(ex.what()));
-                    return false;
-                }
-                return true;
             }
 
-            const DependencyDesc &dependency;
-            const std::filesystem::path &workspaceRoot;
-            ArchiveFetchResult &result;
-            DiagnosticSink &diagnostics;
-            const std::filesystem::path archiveRoot;
-            const std::filesystem::path downloadPath;
-            const std::filesystem::path sourceDir;
-            const std::filesystem::path tmp;
-            std::vector<std::string> patchHashes;
-        };
-    }
+            return true;
+        }
+
+        bool finalize()
+        {
+            if (!dependency.patches.empty())
+            {
+                PatchApplier patcher;
+                if (!patcher.apply(tmp, workspaceRoot, PatchOptions{dependency.patches, dependency.stripComponents},
+                                   result.patchHashes, diagnostics))
+                {
+                    std::filesystem::remove_all(tmp);
+                    return false;
+                }
+            }
+            else
+            {
+                result.patchHashes = patchHashes;
+            }
+            if (!ArchiveData::writeMarker(tmp, dependency, result.archiveHash, result.patchHashes, diagnostics))
+            {
+                std::filesystem::remove_all(tmp);
+                return false;
+            }
+            try
+            {
+                std::filesystem::rename(tmp, sourceDir);
+            }
+            catch (const std::exception &ex)
+            {
+                diagnostics.error("failed to finalize archive source directory: " + std::string(ex.what()));
+                return false;
+            }
+            return true;
+        }
+
+        const DependencyDesc &dependency;
+        const std::filesystem::path &workspaceRoot;
+        ArchiveFetchResult &result;
+        DiagnosticSink &diagnostics;
+        const std::filesystem::path archiveRoot;
+        const std::filesystem::path downloadPath;
+        const std::filesystem::path sourceDir;
+        const std::filesystem::path tmp;
+        std::vector<std::string> patchHashes;
+    };
 
     bool ArchiveFetcher::fetchAndExtract(const DependencyDesc &dependency, const std::filesystem::path &workspaceRoot,
                                          const std::filesystem::path &cacheRoot, ArchiveFetchResult &result,
@@ -733,4 +726,4 @@ namespace rhodium
     {
         return ArchiveRestore(dependency, workspaceRoot, cacheRoot, result, diagnostics).run();
     }
-}
+} // namespace rhodium

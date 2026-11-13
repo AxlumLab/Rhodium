@@ -7,6 +7,7 @@
 #pragma once
 
 #include "rhodium/cli/CommandContext.hpp"
+#include "rhodium/core/CleanSession.hpp"
 #include "rhodium/config/DependencyOverrideFile.hpp"
 #include "rhodium/config/LockFile.hpp"
 #include "rhodium/diagnostics/ConsoleDiagnosticSink.hpp"
@@ -58,15 +59,6 @@ namespace rhodium
         bool rebuild = false;
         std::string updatePackage;
         bool updateAll = false;
-    };
-
-    struct CleanOptions
-    {
-        bool all = false;
-        bool artifacts = false;
-        bool sources = false;
-        bool lock = false;
-        std::string packageName;
     };
 
     struct PackageGcOptions

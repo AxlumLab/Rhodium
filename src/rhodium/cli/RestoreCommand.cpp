@@ -1,11 +1,11 @@
-#include "rhodium/package/ToolchainContextResolver.hpp"
-#include "rhodium/core/WorkspaceLock.hpp"
 /*
- * @Author: cubevlmu khfahqp@gmail.com
- * @LastEditors: cubevlmu khfahqp@gmail.com
- * Copyright (c) 2026 by FlybirdGames, All Rights Reserved.
+ * @Author: khfahqp khfahqp@gmail.com
+ * @LastEditors: khfahqp khfahqp@gmail.com
+ * Copyright (c) 2026 by AxlumLab, All Rights Reserved.
  */
 
+#include "rhodium/package/ToolchainContextResolver.hpp"
+#include "rhodium/core/WorkspaceLock.hpp"
 #include "rhodium/cli/Commands.hpp"
 
 #include "rhodium/config/LockFile.hpp"
@@ -22,66 +22,60 @@
 
 namespace rhodium
 {
-    namespace
+    class RestoreCli final
     {
-        class RestoreCli final
+    public:
+        static std::string duration(std::chrono::milliseconds value)
         {
-        public:
-            static std::string duration(std::chrono::milliseconds value)
+            auto ms = value.count();
+            if (ms < 1000)
             {
-                auto ms = value.count();
-                if (ms < 1000)
-                {
-                    return std::to_string(ms) + "ms";
-                }
-                else if (ms < 60000)
-                {
-                    double seconds = ms / 1000.0;
-                    return fmt::format("{:.1f}s", seconds);
-                }
-                else
-                {
-                    int minutes = static_cast<int>(ms / 60000);
-                    int seconds = static_cast<int>((ms % 60000) / 1000);
-                    return std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
-                }
+                return std::to_string(ms) + "ms";
             }
-        };
-    }
+            else if (ms < 60000)
+            {
+                double seconds = ms / 1000.0;
+                return fmt::format("{:.1f}s", seconds);
+            }
+            else
+            {
+                int minutes = static_cast<int>(ms / 60000);
+                int seconds = static_cast<int>((ms % 60000) / 1000);
+                return std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
+            }
+        }
+    };
 
-    namespace
+    class RestoreTimer final
     {
-        class RestoreTimer final
+    public:
+        RestoreTimer(DiagnosticSink &diagnostics, std::chrono::steady_clock::time_point start)
+            : diagnostics(diagnostics), start(start)
         {
-        public:
-            RestoreTimer(DiagnosticSink &diagnostics, std::chrono::steady_clock::time_point start)
-                : diagnostics(diagnostics), start(start)
-            {
-            }
+        }
 
-            int failed() const
-            {
-                diagnostics.error("restore failed (took " + elapsed() + ")");
-                return 1;
-            }
+        int failed() const
+        {
+            diagnostics.error("restore failed (took " + elapsed() + ")");
+            return 1;
+        }
 
-            void completed(bool update) const
-            {
-                diagnostics.success((update ? "update completed (took " : "restore completed (took ") + elapsed() +
-                                    ")");
-            }
+        void completed(bool update) const
+        {
+            diagnostics.success((update ? "update completed (took " : "restore completed (took ") + elapsed() +
+                                ")");
+        }
 
-        private:
-            std::string elapsed() const
-            {
-                return RestoreCli::duration(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start));
-            }
+    private:
+        std::string elapsed() const
+        {
+            return RestoreCli::duration(
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start));
+        }
 
-            DiagnosticSink &diagnostics;
-            std::chrono::steady_clock::time_point start;
-        };
-    }
+        DiagnosticSink &diagnostics;
+        std::chrono::steady_clock::time_point start;
+    };
 
     int Commands::restore(const std::filesystem::path &workspaceRoot, const RestoreRequest &request)
     {

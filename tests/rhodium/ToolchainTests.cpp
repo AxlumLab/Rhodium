@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace
+namespace rhodium::tests::toolchainTests
 {
     std::filesystem::path makeTempDir()
     {
@@ -56,8 +56,7 @@ namespace
 #endif
     }
 
-    void createFakeMsvcToolchain(const std::filesystem::path &vsRoot,
-                                 const std::filesystem::path &sdkRoot,
+    void createFakeMsvcToolchain(const std::filesystem::path &vsRoot, const std::filesystem::path &sdkRoot,
                                  const std::vector<std::string> &targetArchs)
     {
         const auto toolRoot = vsRoot / "VC" / "Tools" / "MSVC" / "14.44.35207";
@@ -86,19 +85,18 @@ namespace
         touchFile(sdkRoot / "bin" / "10.0.26100.0" / "x64" / "mt.exe");
     }
 
-    const rhodium::ToolchainProfile *findProfile(const std::vector<rhodium::ToolchainProfile> &profiles, const std::string &id)
+    const rhodium::ToolchainProfile *findProfile(const std::vector<rhodium::ToolchainProfile> &profiles,
+                                                 const std::string &id)
     {
-        const auto it = std::find_if(profiles.begin(), profiles.end(), [&](const auto &profile) {
-            return profile.id == id;
-        });
+        const auto it =
+            std::find_if(profiles.begin(), profiles.end(), [&](const auto &profile) { return profile.id == id; });
         return it == profiles.end() ? nullptr : &*it;
     }
 
     bool hasPathWith(const std::vector<std::filesystem::path> &paths, const std::string &needle)
     {
-        return std::any_of(paths.begin(), paths.end(), [&](const auto &path) {
-            return path.generic_string().find(needle) != std::string::npos;
-        });
+        return std::any_of(paths.begin(), paths.end(),
+                           [&](const auto &path) { return path.generic_string().find(needle) != std::string::npos; });
     }
 
     TEST(ToolchainTests, WritesAndReadsToolchainProfiles)
@@ -140,7 +138,8 @@ namespace
         profile.missing = {"windows_sdk", "rc", "mt"};
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::ToolchainRegistry::write(path, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::write(path, {profile}, diagnostics))
+            << diagnostics.diagnostics().dump();
 
         std::vector<rhodium::ToolchainProfile> loaded;
         ASSERT_TRUE(rhodium::ToolchainRegistry::read(path, loaded, diagnostics)) << diagnostics.diagnostics().dump();
@@ -199,11 +198,12 @@ namespace
         profile.systemLibDirs.push_back(lib);
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::ToolchainRegistry::writeUser(dir, rhodium::ToolchainSource::ProjectUser, {profile}, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(
+            rhodium::ToolchainRegistry::writeUser(dir, rhodium::ToolchainSource::ProjectUser, {profile}, diagnostics))
+            << diagnostics.diagnostics().dump();
         const auto loaded = rhodium::ToolchainRegistry::load(dir, diagnostics);
-        const auto manual = std::find_if(loaded.begin(), loaded.end(), [](const auto &loadedProfile) {
-            return loadedProfile.profile.id == "manual-clang-x64";
-        });
+        const auto manual = std::find_if(loaded.begin(), loaded.end(), [](const auto &loadedProfile)
+                                         { return loadedProfile.profile.id == "manual-clang-x64"; });
         ASSERT_NE(manual, loaded.end());
         EXPECT_TRUE(manual->profile.complete);
         EXPECT_TRUE(hasMissing(manual->profile, "optional:git"));
@@ -274,10 +274,12 @@ namespace
         config.preferredToolchain = "windows-msvc-x64";
 
         rhodium::JsonDiagnosticSink diagnostics;
-        ASSERT_TRUE(rhodium::ToolchainRegistry::writeConfig(dir, config, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::writeConfig(dir, config, diagnostics))
+            << diagnostics.diagnostics().dump();
 
         rhodium::LocalToolchainConfig loaded;
-        ASSERT_TRUE(rhodium::ToolchainRegistry::readConfig(dir, loaded, diagnostics)) << diagnostics.diagnostics().dump();
+        ASSERT_TRUE(rhodium::ToolchainRegistry::readConfig(dir, loaded, diagnostics))
+            << diagnostics.diagnostics().dump();
         EXPECT_EQ(loaded.preferredToolchain, "windows-msvc-x64");
 
         std::filesystem::remove_all(dir);
@@ -287,7 +289,8 @@ namespace
     {
         const std::map<std::string, std::string> env{{"RHODIUM_PROCESS_ENV_TEST", "rhodium-env-ok"}};
 #ifdef _WIN32
-        const auto result = rhodium::Process::run("cmd.exe", {"/D", "/S", "/C", "echo %RHODIUM_PROCESS_ENV_TEST%"}, env);
+        const auto result =
+            rhodium::Process::run("cmd.exe", {"/D", "/S", "/C", "echo %RHODIUM_PROCESS_ENV_TEST%"}, env);
 #else
         const auto result = rhodium::Process::run("sh", {"-c", "printf '%s' \"$RHODIUM_PROCESS_ENV_TEST\""}, env);
 #endif
@@ -307,9 +310,8 @@ namespace
         rhodium::ToolchainDetector::android(profiles, sdk, {}, diagnostics);
 
         ASSERT_EQ(profiles.size(), 4u);
-        const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
-            return profile.id == "android-clang-arm64";
-        });
+        const auto arm64 = std::find_if(profiles.begin(), profiles.end(),
+                                        [](const auto &profile) { return profile.id == "android-clang-arm64"; });
         ASSERT_NE(arm64, profiles.end());
         EXPECT_FALSE(arm64->complete);
         EXPECT_EQ(arm64->androidSdkRoot, sdk);
@@ -354,9 +356,8 @@ namespace
         std::vector<rhodium::ToolchainProfile> profiles;
         rhodium::ToolchainDetector::android(profiles, sdk, ndk, diagnostics);
 
-        const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
-            return profile.id == "android-clang-arm64";
-        });
+        const auto arm64 = std::find_if(profiles.begin(), profiles.end(),
+                                        [](const auto &profile) { return profile.id == "android-clang-arm64"; });
         ASSERT_NE(arm64, profiles.end());
         EXPECT_NE(arm64->compiler.filename().string().find("aarch64-linux-android23-clang"), std::string::npos);
         EXPECT_NE(arm64->cxxCompiler.filename().string().find("aarch64-linux-android23-clang++"), std::string::npos);
@@ -397,9 +398,8 @@ namespace
         std::vector<rhodium::ToolchainProfile> profiles;
         rhodium::ToolchainDetector::android(profiles, sdk, ndk, diagnostics);
 
-        const auto arm64 = std::find_if(profiles.begin(), profiles.end(), [](const auto &profile) {
-            return profile.id == "android-clang-arm64";
-        });
+        const auto arm64 = std::find_if(profiles.begin(), profiles.end(),
+                                        [](const auto &profile) { return profile.id == "android-clang-arm64"; });
         ASSERT_NE(arm64, profiles.end());
         EXPECT_EQ(arm64->compiler.filename().string(), toolFileName("clang"));
         EXPECT_EQ(arm64->cxxCompiler.filename().string(), toolFileName("clang++"));
@@ -407,4 +407,4 @@ namespace
 
         std::filesystem::remove_all(dir);
     }
-}
+} // namespace rhodium::tests::toolchainTests

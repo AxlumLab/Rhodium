@@ -128,4 +128,4 @@ error: circular dependency detected: packageA
 
 ### Lock File
 
-Transitive dependencies are recorded in `tpkg.lock.toml` along with their exact versions (commits), ensuring reproducible builds across machines.
+Transitive dependencies are recorded in `rhodium.lock.toml` along with their exact versions (commits), ensuring reproducible builds across machines.

@@ -11,181 +11,179 @@
 
 namespace rhodium
 {
-    namespace
+
+    class CMakeText final
     {
-        class CMakeText final
+    public:
+        static std::string string(const std::string &value)
         {
-        public:
-            static std::string string(const std::string &value)
+            std::string result = "\"";
+            for (const auto ch : value)
             {
-                std::string result = "\"";
-                for (const auto ch : value)
+                if (ch == '\\' || ch == '"' || ch == '$')
                 {
-                    if (ch == '\\' || ch == '"' || ch == '$')
-                    {
-                        result.push_back('\\');
-                    }
-                    result.push_back(ch);
+                    result.push_back('\\');
                 }
-                result.push_back('"');
-                return result;
+                result.push_back(ch);
             }
+            result.push_back('"');
+            return result;
+        }
 
-            static std::string path(const std::filesystem::path &path)
+        static std::string path(const std::filesystem::path &path)
+        {
+            return CMakeText::string(path.generic_string());
+        }
+
+        static std::string target(const std::string &packageName)
+        {
+            std::string result;
+            result.reserve(packageName.size());
+            for (const unsigned char ch : packageName)
             {
-                return CMakeText::string(path.generic_string());
+                if (std::isalnum(ch) || ch == '_' || ch == '-' || ch == '.' || ch == '+')
+                {
+                    result.push_back(static_cast<char>(ch));
+                }
+                else
+                {
+                    result.push_back('_');
+                }
             }
+            return "rhodium::" + (result.empty() ? std::string("package") : result);
+        }
 
-            static std::string target(const std::string &packageName)
+        static void stringProperty(std::ostringstream &stream, const std::string &target, const char *property,
+                                   const std::vector<std::string> &values)
+        {
+            if (values.empty())
             {
-                std::string result;
-                result.reserve(packageName.size());
-                for (const unsigned char ch : packageName)
-                {
-                    if (std::isalnum(ch) || ch == '_' || ch == '-' || ch == '.' || ch == '+')
-                    {
-                        result.push_back(static_cast<char>(ch));
-                    }
-                    else
-                    {
-                        result.push_back('_');
-                    }
-                }
-                return "rhodium::" + (result.empty() ? std::string("package") : result);
+                return;
             }
-
-            static void stringProperty(std::ostringstream &stream, const std::string &target, const char *property,
-                                       const std::vector<std::string> &values)
+            stream << "set_property(TARGET " << target << " PROPERTY " << property << "\n";
+            for (const auto &value : values)
             {
-                if (values.empty())
-                {
-                    return;
-                }
-                stream << "set_property(TARGET " << target << " PROPERTY " << property << "\n";
-                for (const auto &value : values)
-                {
-                    stream << "    " << CMakeText::string(value) << "\n";
-                }
-                stream << ")\n\n";
+                stream << "    " << CMakeText::string(value) << "\n";
             }
+            stream << ")\n\n";
+        }
 
-            static void pathProperty(std::ostringstream &stream, const std::string &target, const char *property,
-                                     const std::vector<std::filesystem::path> &values)
+        static void pathProperty(std::ostringstream &stream, const std::string &target, const char *property,
+                                 const std::vector<std::filesystem::path> &values)
+        {
+            if (values.empty())
             {
-                if (values.empty())
-                {
-                    return;
-                }
-                stream << "set_property(TARGET " << target << " PROPERTY " << property << "\n";
-                for (const auto &value : values)
-                {
-                    stream << "    " << CMakeText::path(value) << "\n";
-                }
-                stream << ")\n\n";
+                return;
             }
-
-            static bool hasPath(const std::string &value)
+            stream << "set_property(TARGET " << target << " PROPERTY " << property << "\n";
+            for (const auto &value : values)
             {
-                return value.find('/') != std::string::npos || value.find('\\') != std::string::npos;
+                stream << "    " << CMakeText::path(value) << "\n";
             }
+            stream << ")\n\n";
+        }
 
-            static std::vector<std::filesystem::path> candidates(const std::filesystem::path &dir,
-                                                                 const std::string &lib)
+        static bool hasPath(const std::string &value)
+        {
+            return value.find('/') != std::string::npos || value.find('\\') != std::string::npos;
+        }
+
+        static std::vector<std::filesystem::path> candidates(const std::filesystem::path &dir, const std::string &lib)
+        {
+            std::vector<std::filesystem::path> candidates;
+            const auto valuePath = std::filesystem::path(lib);
+            if (CMakeText::hasPath(lib) || valuePath.has_extension())
             {
-                std::vector<std::filesystem::path> candidates;
-                const auto valuePath = std::filesystem::path(lib);
-                if (CMakeText::hasPath(lib) || valuePath.has_extension())
-                {
-                    candidates.push_back(valuePath.is_absolute() ? valuePath : dir / valuePath);
-                    return candidates;
-                }
-                for (const auto &pattern : {
-                         std::string("{}.lib"),
-                         std::string("lib{}.lib"),
-                         std::string("lib{}.a"),
-                         std::string("lib{}.so"),
-                         std::string("lib{}.dylib"),
-                         std::string("{}.a"),
-                         std::string("{}.so"),
-                         std::string("{}.dylib"),
-                     })
-                {
-                    auto text = pattern;
-                    text.replace(text.find("{}"), 2, lib);
-                    candidates.push_back(dir / text);
-                }
+                candidates.push_back(valuePath.is_absolute() ? valuePath : dir / valuePath);
                 return candidates;
             }
-
-            static bool libraries(const ResolvedDependencyArtifact &package, std::vector<std::string> &linkItems,
-                                  DiagnosticSink &diagnostics)
+            for (const auto &pattern : {
+                     std::string("{}.lib"),
+                     std::string("lib{}.lib"),
+                     std::string("lib{}.a"),
+                     std::string("lib{}.so"),
+                     std::string("lib{}.dylib"),
+                     std::string("{}.a"),
+                     std::string("{}.so"),
+                     std::string("{}.dylib"),
+                 })
             {
-                for (const auto &libFile : package.libFiles)
-                {
-                    if (!std::filesystem::is_regular_file(libFile))
-                    {
-                        diagnostics.error("package " + package.name +
-                                          " declares library file but it is missing: " + libFile.generic_string());
-                        return false;
-                    }
-                    linkItems.push_back(libFile.generic_string());
-                }
+                auto text = pattern;
+                text.replace(text.find("{}"), 2, lib);
+                candidates.push_back(dir / text);
+            }
+            return candidates;
+        }
 
-                for (const auto &lib : package.libs)
+        static bool libraries(const ResolvedDependencyArtifact &package, std::vector<std::string> &linkItems,
+                              DiagnosticSink &diagnostics)
+        {
+            for (const auto &libFile : package.libFiles)
+            {
+                if (!std::filesystem::is_regular_file(libFile))
                 {
-                    bool found = false;
-                    std::vector<std::filesystem::path> tried;
-                    for (const auto &libDir : package.libDirs)
+                    diagnostics.error("package " + package.name +
+                                      " declares library file but it is missing: " + libFile.generic_string());
+                    return false;
+                }
+                linkItems.push_back(libFile.generic_string());
+            }
+
+            for (const auto &lib : package.libs)
+            {
+                bool found = false;
+                std::vector<std::filesystem::path> tried;
+                for (const auto &libDir : package.libDirs)
+                {
+                    for (const auto &candidate : CMakeText::candidates(libDir, lib))
                     {
-                        for (const auto &candidate : CMakeText::candidates(libDir, lib))
+                        tried.push_back(candidate);
+                        if (std::filesystem::is_regular_file(candidate))
                         {
-                            tried.push_back(candidate);
-                            if (std::filesystem::is_regular_file(candidate))
-                            {
-                                linkItems.push_back(candidate.generic_string());
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found)
-                        {
+                            linkItems.push_back(candidate.generic_string());
+                            found = true;
                             break;
                         }
                     }
-                    if (!found)
+                    if (found)
                     {
-                        std::ostringstream message;
-                        message << "package " << package.name << " declares library '" << lib
-                                << "' but no matching library file was found";
-                        if (!package.libDirs.empty())
-                        {
-                            message << "\nsearched:";
-                            for (const auto &candidate : tried)
-                            {
-                                message << "\n  " << candidate.generic_string();
-                            }
-                        }
-                        diagnostics.error(message.str());
-                        return false;
+                        break;
                     }
                 }
-
-                linkItems.insert(linkItems.end(), package.systemLibs.begin(), package.systemLibs.end());
-                for (const auto &framework : package.frameworks)
+                if (!found)
                 {
-                    linkItems.push_back("-framework " + framework);
+                    std::ostringstream message;
+                    message << "package " << package.name << " declares library '" << lib
+                            << "' but no matching library file was found";
+                    if (!package.libDirs.empty())
+                    {
+                        message << "\nsearched:";
+                        for (const auto &candidate : tried)
+                        {
+                            message << "\n  " << candidate.generic_string();
+                        }
+                    }
+                    diagnostics.error(message.str());
+                    return false;
                 }
-                return true;
             }
 
-            static std::string set(const char *name, const std::string &value)
+            linkItems.insert(linkItems.end(), package.systemLibs.begin(), package.systemLibs.end());
+            for (const auto &framework : package.frameworks)
             {
-                return std::string("set(") + name + " " + CMakeText::string(value) + ")\n";
+                linkItems.push_back("-framework " + framework);
             }
+            return true;
+        }
 
-            static void abiChecks(std::ostringstream &config)
-            {
-                config << R"cmake(
+        static std::string set(const char *name, const std::string &value)
+        {
+            return std::string("set(") + name + " " + CMakeText::string(value) + ")\n";
+        }
+
+        static void abiChecks(std::ostringstream &config)
+        {
+            config << R"cmake(
 if(RHODIUM_COMPILER_KIND MATCHES "^(msvc|clang-cl)$" OR RHODIUM_TOOLCHAIN_ID MATCHES "msvc|clang-cl")
     if(NOT (MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "MSVC|Clang" OR CMAKE_C_COMPILER_ID MATCHES "MSVC|Clang"))
         message(WARNING "rhodium artifacts were restored with an MSVC ABI toolchain (${RHODIUM_TOOLCHAIN_ID}), but CMake may not be using a compatible compiler. CMAKE_CXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}")
@@ -258,10 +256,8 @@ if(MSVC AND RHODIUM_RUNTIME MATCHES "static|dynamic")
 endif()
 
 )cmake";
-            }
-        };
-
-    }
+        }
+    };
 
     bool CMakeDependency::writeFiles(const std::vector<ResolvedDependencyArtifact> &packages,
                                      const std::filesystem::path &outputDir,
@@ -331,4 +327,4 @@ endif()
     {
         return writeFiles(packages, outputDir, CMakeDependencyExportMetadata{}, diagnostics);
     }
-}
+} // namespace rhodium
